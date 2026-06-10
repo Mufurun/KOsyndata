@@ -4,12 +4,19 @@
 \usepackage{CJKutf8}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
-
+\usepackage{hyperref} 
+\usepackage{float}
 
 
 \begin{document}
 
-\begin{figure}
+In this PDF, I highlight the basic idea of Bayesian analysis based on the online lecture: Statistical Rethinking (\url{https://github.com/rmcelreath/stat_rethinking_2026}) by Richard McElreath. 
+The typical Bayesian analysis follows the core workflow shown in Fig. 1. 
+Since this pioneer project does not have its own data, the analysis was made by the synthetic data initialized by my personal assumptions. \\
+\\
+
+
+\begin{figure}[H]
 
     \centering
     \begin{tikzpicture}[
@@ -41,9 +48,11 @@
 \end{figure}
 
 
+The parameters in the dataset forms causal relationship in Fig. 2, based on my assumption. 
+Publication and publication year can bias the proportion of Kozu obsidians. Although S, O and K can be related each other, I included single causality to be simple. 
 
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering 
 \begin{tikzpicture}[
     node distance=2cm,
@@ -66,9 +75,13 @@
 \end{tikzpicture}
 \caption{DAG of causalities among attributes of dataset - K: a ratio of Kouzu obsidians, S: a ratio of Shinshu obsidians, O: other sites, T: typology of artifacts or associated artifacts in the same layer, P: publication, PY: publication year.  }
 \end{figure}
+\newpage
+
+Now, hypothesis of the analysis is sea level and proportion of Shinshu obsidians affect the Kozu obsidians to check the degree of influence. 
+The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist in the data. 
 
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering 
 \begin{tikzpicture}[
     node distance=2cm,
@@ -98,6 +111,52 @@
 \end{tikzpicture}
 \caption{DAG of causalities among parameters - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
 \end{figure}
+
+
+
+U is the standard deviation of the model. There are ways to model SL: model SL by wither Y or T. 
+As a background knowledge, we know the association of SL and Y based on previous research (). 
+\\
+\\
+1. SL and T modeled by Y (Fig. 3, see m1.r): \\
+- As T is observed Y, Y can be the True value of T. Then I can make multilevel models, including Y predicts T. 
+As Y is estimated in ulam model of rethinking package, we can use it to estimate SL and K. 
+\\
+\\
+2. SL modeled by T (Fig.4, see m2.r): \\ 
+- based on the Bayesian analysis of Typological dates by Kanezaki, Omori, and Kobayashi in 2025 (\url{https://www.cambridge.org/core/journals/radiocarbon/article/optimal-bayesian-chronological-modeling-for-high-resolution-chronology-for-the-middle-jomon-of-kanto-region-honshu-island-japan-approaching-a-generational-scale/4B1717D6D82FFA1CF8A63E6B1EBCCC8D}), 
+we can estimate Y, which lead to SL. So, in this case, I put SL depending on T. 
+
+\begin{figure}[H]
+\centering 
+\begin{tikzpicture}[
+    node distance=2cm,
+    solid_node/.style={circle, draw, minimum size=8mm, thick},
+    dashed_node/.style={circle, draw, dashed, minimum size=8mm, thick},
+    directed/.style={-Stealth, thick} 
+]
+    \node[dashed_node] (Y) at (2,5) {Y};
+    \node (T) at (6,2.5) {T};
+    \node[dashed_node] (U) at (1,1) {U};
+    \node[red, dashed_node] (SL) at (1.5,2.7) {SL};
+    \node[blue, rectangle, draw, minimum size=7mm, thick] (K) at (3,1) {K};
+    \node[red, solid_node] (S) at (3.5,3.2) {S};
+    \node (dK) at (4.5,1) {dK};
+    \node (dS) at (4,2) {dS};
+    \draw [->] (T) -- (Y);
+    \draw [->] (Y) -- (SL);
+    \draw [->] (T) -- (S);
+    \draw [->] (T) -- (K);
+    \draw [->, red, thick] (SL) -- (K);
+    \draw [->] (dS) -- (S);
+    \draw [->] (dK) -- (K);
+    \draw [->, red, thick] (S) -- (K);
+    \draw [->] (U) -- (K);
+\end{tikzpicture}
+\caption{DAG of causalities among parameters - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
+\end{figure}
+
+
 
 
 
