@@ -1,0 +1,2018 @@
+```{r memo}
+
+library("rethinking")
+# Causal effects
+library(dagitty)
+kdag<-dagitty("dag {
+  
+  S-> K <- T 
+  T -> S
+  
+  T -> SL -> t
+
+
+}")
+adjustmentSets(kdag, exposure="SL", outcome = "K")
+
+
+
+library(dagitty)
+kdag<-dagitty("dag {
+  G->Y<-X 
+  G->X 
+  Z->Y
+
+
+
+}")
+adjustmentSets(kdag, exposure="X", outcome = "Y")
+
+
+
+T<-1:25
+SL<-NULL
+for (i in T)SL[i]<- rnorm(1, - (T[i] - 50)^2 * 2/ 800+ 3, 0.6)
+
+T<- round(runif(200, 1,25))
+SL<-NULL
+for (i in 1:length(T)) SL[i]<- rnorm(1, - (1/ 40 )*(T[i] - 12.5)^2 + 2, 0.5)
+plot(T, SL)
+
+dS<-rbeta(length(T), 1.2,1)
+S<-NULL
+for(i in 1:length(T_K))S[i] <- rnorm(1, 0.01*T[i]-2.2*dS[i]+5, 0.4)/7.5
+plot(density(S))
+plot(dS, S)
+curve((-2.2 * x + 0.01*mean(T)+ 5)/7.5, add=TRUE)
+
+dK<-rbeta(length(T), 1.4,1)
+K<-NULL
+for(i in 1:length(T))K[i] <- rnorm(1, 1.5*SL[i] + 0.01* T[i] + 3.2* S[i]- 2*dK[i]+7, 0.1)/17
+plot(density(K))
+
+# check
+plot(dK, K)
+curve((-2 * x + 1.5*mean(SL) + 0.01* mean(T) + 3.2* mean(S)+ 7)/17, add=TRUE)
+plot(SL, K)
+curve((-2 * mean(dS) + 1.5*x + 0.01* mean(T) + 3.2* mean(S)+ 7)/17, add=TRUE)
+plot(S, K)
+curve((-2 * mean(dS) + 1.5*mean(SL) + 0.01* mean(T) + 3.2* x+ 7)/17, add=TRUE)
+
+d<-list(T=T, SL=SL, dS=dS, S=S, K=K, dK=dK )
+d
+
+
+plot(K, exp()/(1+exp()))
+m1<- ulam(
+    alist (
+        K~dnorm(mu, sigma), 
+        mu <- a[T] + b_SL[T] * SL, 
+        a[T]~dnorm(0,1), 
+        b_SL[T]~dexp(1), 
+        sigma~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S), chains=4
+)
+precis(m1, depth=2)
+dashboard(m1)
+# Plots
+
+plot(SL, K)
+curve(0.45 + 0.09*x, add=TRUE) # no pooling 
+
+# partial poling with one parameter
+points(SL[d$T == 2], K[d$T == 2], col =2, lwd = 4)
+curve(0.40 + 0.05*x, col = 2, add=TRUE, lwd=3)
+points(SL[d$T == 24], K[d$T == 24], col =3, lwd = 4)
+curve(0.43 + 0.07*x, col = 3, add=TRUE, lwd=3)
+
+# Posterior Prediction
+plot(SL, K)
+post1<-sim(m1, data = list(SL = seq(-3, 3, len=20), T = rep(2, 20))) # T = 2 
+means1<-apply(post1, 2, mean)
+PIs1<-apply(post1, 2, PI)
+lines(seq(-3, 3, len=20), means1, col = 2)
+lines(seq(-3, 3, len=20), PIs1[1,], col = 2)
+lines(seq(-3, 3, len=20), PIs1[2,], col = 2)
+
+post1<-sim(m1, data = list(SL = seq(-3, 3, len=20), T = rep(22, 20))) # T = 22
+means1<-apply(post1, 2, mean)
+PIs1<-apply(post1, 2, PI)
+lines(seq(-3, 3, len=20), means1, col = 3)
+lines(seq(-3, 3, len=20), PIs1[1,], col = 3)
+lines(seq(-3, 3, len=20), PIs1[2,], col = 3)
+
+
+
+
+
+m1.2<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a[T] + b_SL[T] * SL + b_S[T] * S, 
+        a[T]~dnorm(0,1), 
+        b_SL[T]~dexp(1), 
+        b_S[T]~dexp(1), 
+        sigma~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S), chains=4, log_lik=TRUE
+)
+precis(m1.2, depth=2)
+
+dashboard(m1.2)
+
+# continuous number then sim??? no Logistic regression force you to use link
+
+plot(SL, K)
+# T = 2, S = 0.5
+post1.2<-link(m1.2, data = list(SL = seq(-3, 3, len=20), S = rep(0.5, 20), T = rep(2, 20)))
+means1.2<-apply(post1.2, 2, mean)
+PI1.2<-apply(post1.2, 2, PI)
+lines(seq(-3, 3, len=20), means1.2, col = 2)
+lines(seq(-3, 3, len=20), PI1.2[1,], col = 2)
+lines(seq(-3, 3, len=20), PI1.2[2,], col = 2)
+
+# T = 22, S = 0.5
+post1.2<-link(m1.2, data = list(SL = seq(-3, 3, len=20), S = rep(0.5, 20), T = rep(22, 20)))
+means1.2<-apply(post1.2, 2, mean)
+PI1.2<-apply(post1.2, 2, PI)
+lines(seq(-3, 3, len=20), means1.2, col = 3)
+lines(seq(-3, 3, len=20), PI1.2[1,], col = 3)
+lines(seq(-3, 3, len=20), PI1.2[2,], col = 3)
+
+# Others as you want
+post1.2<-link(m1.2, data = list(SL = seq(-3, 3, len=20), S = rep(0.1, 20), T = rep(14, 20)))
+means1.2<-apply(post1.2, 2, mean)
+PI1.2<-apply(post1.2, 2, PI)
+lines(seq(-3, 3, len=20), means1.2, col = 3)
+lines(seq(-3, 3, len=20), PI1.2[1,], col = 3)
+lines(seq(-3, 3, len=20), PI1.2[2,], col = 3)
+
+
+
+m1.3<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a[T] + b_SL[T] * SL + b_S[T] * S + a_dK * dK, 
+        a[T]~dnorm(0,1), 
+        b_SL[T]~dexp(1), 
+        b_S[T]~dexp(1), 
+        a_dK~ dnorm(-1, 0.5), # this is not pooled since it should be same over time
+        sigma~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S, dK=d$dK), chains=4, log_lik=TRUE
+)
+dashboard(m1.3)
+precis(m1.3)
+
+
+plot(S, K)
+post1.3<-link(m1.3, data = list(S = seq(0, 1, len=20), SL = rep(0, 20), T = rep(4, 20), dK=rep(0.5, 20)))
+means1.3<-apply(post1.3, 2, mean)
+PI1.3<-apply(post1.3, 2, PI)
+lines(seq(0, 1, len=20), means1.3, col = 3)
+lines(seq(0, 1, len=20), PI1.3[1,], col = 3)
+lines(seq(0, 1, len=20), PI1.3[2,], col = 3)
+
+
+m1.4<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a[T] + b_SL[T] * SL + b_S[T] * S + a_dK * dK + U[T], 
+        a[T]~dnorm(0,1), 
+        b_SL[T]~dexp(1), 
+        b_S[T]~dexp(1), 
+        a_dK~ dnorm(-1, 0.5), # this is not pooled since it should be same over time
+        U[T]~ dnorm(0, 1),
+        sigma~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S, dK=d$dK), chains=4, log_lik=TRUE
+)
+dashboard(m1.4)
+precis(m1.4)
+
+plot(SL, K)
+post1.4<-link(m1.4, data = list(SL = seq(-3, 3, len=20), S = rep(0.5, 20), T = rep(4, 20), dK=rep(0.5, 20)))
+means1.4<-apply(post1.4, 2, mean)
+PI1.4<-apply(post1.4, 2, PI)
+lines(seq(-3, 3, len=20), means1.4, col = 3)
+lines(seq(-3, 3, len=20), PI1.4[1,], col = 3)
+lines(seq(-3, 3, len=20), PI1.4[2,], col = 3)
+
+
+# We have not yet modeled this -> we have to do this !!!
+plot(T, K)
+post1.4<-link(m1.4, data = list(SL = rep(0, 25), S = rep(0.5, 25), T = 1:25, dK=rep(0.5, 25)))
+means1.4<-apply(post1.4, 2, mean)
+PI1.4<-apply(post1.4, 2, PI)
+
+for (i in 1:25){
+    points(i, means1.4[i], col = 2, lwd = 3)
+    points(i, PI1.4[1,i], col = 2, lwd = 2)
+    points(i, PI1.4[2,i], col = 2, lwd = 2)
+
+}
+
+# Not stratified model 
+m1.5<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a + b_SL * SL + b_S * S + a_dK * dK + U, 
+        a~dnorm(0,1), 
+        b_SL~dexp(1), 
+        b_S~dexp(1), 
+        a_dK~ dnorm(-1, 0.5), # this is not pooled since it should be same over time
+        U~ dnorm(0, 1),
+        sigma~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S, dK=d$dK), chains=4, log_lik=TRUE
+)
+dashboard(m1.5)
+precis(m1.5)
+
+plot(SL, K)
+post1.5<-link(m1.5, data = list(SL = seq(-3, 3, len=20), S = rep(0.5, 20), dK=rep(0.5, 20)))
+means1.5<-apply(post1.5, 2, mean)
+PI1.5<-apply(post1.5, 2, PI)
+lines(seq(-3, 3, len=20), means1.5, col = 3)
+lines(seq(-3, 3, len=20), PI1.5[1,], col = 3)
+lines(seq(-3, 3, len=20), PI1.5[2,], col = 3)
+
+plot(S, K)
+post1.5<-link(m1.5, data = list(S = seq(0, 1, len=20), SL = rep(0, 20), dK=rep(0.5, 20)))
+means1.5<-apply(post1.5, 2, mean)
+PI1.5<-apply(post1.5, 2, PI)
+lines(seq(-3, 3, len=20), means1.5, col = 3)
+lines(seq(-3, 3, len=20), PI1.5[1,], col = 3)
+lines(seq(-3, 3, len=20), PI1.5[2,], col = 3)
+
+# Two models 
+m2<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a + b_SL * SL + b_S * S + b_dK * dK + U, 
+        a~dnorm(0,1), 
+        b_SL~dexp(1), 
+        b_S~dexp(1), 
+        b_dK~ dnorm(-1, 0.5), # this is not pooled since it should be same over time
+        sigma~dexp(1),
+
+        S~dnorm(p3, sigma3),
+        logit(p3)<- a_S[T] + b_dS * dS,
+        b_dS~ dnorm(-1, 0.5), 
+        a_S[T]~dnorm(0, 1),
+        sigma3~dexp(1),
+
+        U~ dnorm(a_T[T], sigma2),
+        a_T[T]~dnorm(0, 1),
+        sigma2~dexp(1)
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S, dK=d$dK, dS=d$dS), chains=4, log_lik=TRUE
+)
+
+dashboard(m2)
+precis(m2)
+
+curve(dpois(5, x), xlim= c(0, 10))
+
+# model the T by unknown Y
+m2<- ulam(
+    alist (
+        K~dnorm(p, sigma), 
+        logit(p) <- a + b_SL * SL + b_S * S + b_dK * dK + U, 
+        a~dnorm(0,1), 
+        b_SL~dexp(1), 
+        b_S~dexp(1), 
+        b_dK~ dnorm(-1, 0.5), # this is not pooled since it should be same over time
+        sigma~dexp(1),
+
+        S~dnorm(p3, sigma3),
+        logit(p3)<- a_S[T] + b_dS * dS,
+        b_dS~ dnorm(-1, 0.5), 
+        a_S[T]~dnorm(0, 1),
+        sigma3~dexp(1),
+
+        U~ dnorm(mu2, sigma2),
+        mu2<- a_T 
+        a_T[T]~dnorm(0, 1),
+        sigma2~dexp(1), 
+
+        T ~ poisson(l),
+        l<-a_lT + b_Y * Y, 
+        a_lT~dnorm(0,1), 
+        b_Y~ dnorm(0,1),
+        Y~dunif(0, 100)
+
+
+    ), dat = list(K=d$K, SL=d$SL, T=d$T, S=d$S, dK=d$dK, dS=d$dS), chains=4, log_lik=TRUE
+)
+
+dashboard(m2)
+precis(m2)
+
+
+rm(list=ls())
+
+```
+
+
+```{r tdm2}
+
+T<-1:25
+SL<-NULL
+for (i in T)SL[i]<- rnorm(1, - (T[i] - 50)^2 * 2/ 800+ 3, 0.6)
+
+T<- round(runif(200, 1,25))
+SL<-NULL
+for (i in 1:length(T)) SL[i]<- rnorm(1, - (1/ 40 )*(T[i] - 12.5)^2 + 2, 0.5)
+plot(T, SL)
+
+dS<-rbeta(length(T), 1.2,1)
+S<-NULL
+for(i in 1:length(T))S[i] <- rnorm(1, - 0.01*(T[i]-13) ^2 -2*dS[i] + 15, 1)/17
+plot(density(S))
+plot(dS, S)
+curve((-2.2 * x + 0.01*mean(T)+ 5)/7.5, add=TRUE)
+plot(T, S)
+plot(T, dS)
+
+
+dK<-rbeta(length(T), 1.4,1)
+K<-NULL
+for(i in 1:length(T))K[i] <- rnorm(1, 4*SL[i] + 0.01* (T[i]-13)^2 + 75* S[i]- 25*dK[i]+15, 1)/90
+plot(density(K))
+plot(dK, K)
+plot(SL, K)
+plot(T, K)
+plot(S, K)
+plot(dS, K)
+
+d<-list(T=T, SL=SL, dS=dS, S=S, K=K, dK=dK)
+d
+
+
+```
+
+
+Sea Level: https://www.sci.kagoshima-u.ac.jp/oyo/advanced/image/endo2015-3.jpg
+
+```{r m1}
+library("rethinking")
+
+
+
+plot(S, SL)
+
+m1<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, 
+        a[T]~dnorm(0,1), 
+
+        b_S[T]~dexp(1), 
+        b_SL[T]~dexp(1), 
+        b_dK~dexp(1), 
+        U~dexp(1),
+
+         S~dnorm(mu2, sigma),
+         mu2 <- a_mu2[T] - b_mu2 * dS,
+         a_mu2[T]~dnorm(0, 1),
+         b_mu2~dexp(1),
+         sigma~dexp(1)
+
+    ), dat = d, chains=4, log_lik=TRUE, 
+    #custom_block = my_stan_function,
+)
+
+
+plot(SL, S)
+precis(lm(SL~S))
+
+m2<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+        a[T]~dnorm(0,1), 
+
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+        matrix[25, 2]:v ~multi_normal_cholesky(c(a_bar1, a_bar2), Rho, sigma),
+        a_bar1~dexp(1),
+        a_bar2~dexp(1),# Sl should be -4 
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+
+        b_dK~dexp(1), 
+        U~dexp(1),
+
+         S~dnorm(mu2, sigma2),
+         mu2 <- a_mu2[T] - b_mu2 * dS,
+         a_mu2[T]~dnorm(0, 1),
+         b_mu2~dexp(1),
+         sigma2~dexp(1)
+
+    ), dat = d, chains=4, log_lik=TRUE, 
+    #custom_block = my_stan_function,
+)
+
+
+precis(m2, depth=2)
+dashboard(m2)
+# Plots
+
+plot(SL, K)
+points(SL[d$T==2], K[d$T==2], col = 2, lwd= 3)
+curve(0.16 + 0.05 * x + 0.87 * 0.2 - 0.29 * 0.5, add=TRUE)
+
+# Posterior Prediction
+post1<-sim(m2, data = list(SL = seq(-3, 3, len=20), T = rep(2, 20), S = rep(0.1, 20), dK = rep(0.5, 20), dS = rep(0.5, 20))) # T = 2 
+means1<-apply(post1, 2, mean)
+PIs1<-apply(post1, 2, PI)
+lines(seq(-3, 3, len=20), means1, col = 2)
+lines(seq(-3, 3, len=20), PIs1[1,], col = 2)
+lines(seq(-3, 3, len=20), PIs1[2,], col = 2)
+
+post1<-sim(m1, data = list(SL = seq(-3, 3, len=20), T = rep(22, 20))) # T = 22
+means1<-apply(post1, 2, mean)
+PIs1<-apply(post1, 2, PI)
+lines(seq(-3, 3, len=20), means1, col = 3)
+lines(seq(-3, 3, len=20), PIs1[1,], col = 3)
+lines(seq(-3, 3, len=20), PIs1[2,], col = 3)
+
+
+m3<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+        a[T]~dnorm(0,1), 
+
+        save>vector[25]:b_S<<- b_S_bar + b_S_sig * v[,1],
+        save>vector[25]:b_SL<<- b_SL_bar + b_SL_sig * v[,2],
+
+        matrix[25, 2]:v ~multi_normal_cholesky(a_bar, Rho, sigma),
+        vector[2]: a_bar~dnorm(0, 1),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+        c(b_S_bar, b_SL_bar)~dexp(0,1),
+        c(b_S_sig, b_SL_sig)~dexp(1),
+
+        b_dK~dexp(1), 
+        U~dexp(1),
+
+         S~dnorm(mu2, sigma2),
+         mu2 <- a_mu2[T] - b_mu2 * dS,
+         a_mu2[T]~dnorm(0, 1),
+         b_mu2~dexp(1),
+         sigma2~dexp(1)
+
+    ), dat = d, chains=4, cores=4, log_lik=TRUE, 
+    #custom_block = my_stan_function,
+)
+precis(m3, depth=2)
+dashboard(m3)
+
+plot(SL, K)
+points(SL[d$T==2], K[d$T==2], col = 2, lwd= 3)
+curve(0.19 + 0.05 * x + 0.83 * 1 - 0.29 * 1, add=TRUE)
+
+# Posterior Prediction
+post1<-sim(m3, data = 
+PIs1<-apply(post1, 2, PI)
+lines(seq(-3, 3, len=20), means1, col = 2)
+lines(seq(-3, 3, len=20), PIs1[1,], col = 2)
+lines(seq(-3, 3, len=20), PIs1[2,], col = 2)
+
+
+rm(list = ls())
+```
+
+
+Same things with actual number before normalize. 
+and normalize within the model 
+
+```{r d2}
+
+T<-1:25
+SL<-NULL
+for (i in T)SL[i]<- rnorm(1, - (T[i] - 50)^2 * 2/ 800+ 3, 0.6)
+
+T<- round(runif(200, 1,25)) 
+SL<-NULL # m
+for (i in 1:length(T)) SL[i]<- rnorm(1, - (1/ 40 )*(T[i] - 12.5)^2 + 2, 0.5)
+plot(T, SL)
+
+dS<-rbeta(length(T), 1.2,1) * 200 # km
+S<-NULL
+for(i in 1:length(T))S[i] <- rnorm(1, - 0.05*(T[i]-13) ^2 -dS[i]/100 + 15, 1)/17
+plot(density(S))
+plot(dS, S)
+points(dS[T==2], S[T==2], col = 2, lwd =3)
+points(dS[T==13], S[T==13], col = 3, lwd =3)
+points(dS[T==7], S[T==7], col = 4, lwd =3)
+plot(T, S)
+plot(T, dS)
+
+
+dK<-rbeta(length(T), 1.4,1)*400
+K<-NULL
+for(i in 1:length(T))K[i] <- rnorm(1, 4*SL[i] + 0.01* (T[i]-13)^2 + 75* S[i]- dK[i]/16, 1)/90
+plot(density(K))
+plot(dK, K)
+plot(SL, K)
+plot(T, K)
+plot(S, K)
+plot(dS, K)
+
+d<-list(T=T, SL=SL, dS=dS, S=S, K=K, dK=dK)
+d
+
+```
+# Model 3
+
+- Model K with SL, S, dK by stratifying by T
+- Correlation between SL and S 
+- Model S with dS 
+
+# Posterior distribution 
+
+
+```{r m3}
+
+# Is there correlation??/ Yes it is!!!!
+plot(S, SL)
+points(S[T==2], SL[T==2], col = 2, lwd=3)
+points(S[T==3], SL[T==3], col = 3, lwd=3)
+
+m3<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+
+        vector[25]: a<-a_bar + siga * za[T],
+        za[T]~dnorm(0,1),
+        a_bar~dnorm(0,1),
+        siga ~ dexp(1),
+
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+
+        matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        SL_bar~dnorm(0.12, 0.1),
+        S_bar~dnorm(1.4, 0.5),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+
+        b_dK~dexp(1), # don't need regularization
+        U~dexp(1),
+
+        S~dnorm(mu2, sigma2),
+        mu2 <- a2[T] - b_dS * dS,
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        za2[T]~dnorm(0,1),
+        a2_bar~dnorm(0,1),
+        siga2 ~ dexp(1),
+
+        b_dS~dexp(1),
+
+        sigma2~dexp(1)
+
+    ), dat = d, chains=4, cores=4, log_lik=TRUE, 
+    #custom_block = my_stan_function,
+)
+
+precis(m3, depth=2)
+dashboard(m3)
+
+plot(SL, K)
+points(SL[d$T==2], K[d$T==2], col = 2, lwd= 3)
+curve(-0.07 + 0.57* (-0.10)+ 3.03 * x + 0.07 * 0.2 - 0.03 * 100, add=TRUE)
+
+# Posterior Check
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m3)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+
+# Prediction model
+means<-NULL
+PIs<-NULL
+means$a <- apply( post$a , 2 , mean )
+means$b_SL <- apply( post$b_SL , 2 , mean )
+means$b_S <- apply( post$b_S , 2 , mean )
+means$b_dK <- apply( post$b_dK , 2 , mean )
+
+plot(SL, K)
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 100, add = TRUE, col = 2)
+PIs$a <- apply( post$a , 2 , PI )
+PIs$b_SL <- apply( post$b_SL , 2 , PI )
+PIs$b_S <- apply( post$b_S , 2 , PI )
+PIs$b_dK <- apply( post$b_dK , 2 , PI )
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 100, add = TRUE, lty=2, col = 2)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 100, add = TRUE, lty=2, col = 2)
+
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 200, add = TRUE, col = 3)
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 200, add = TRUE, lty=2, col = 3)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 200, add = TRUE, lty=2, col = 3)
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 300, add = TRUE, col = 4)
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 300, add = TRUE, lty=2, col = 4)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 300, add = TRUE, lty=2, col = 4)
+
+
+plot(S, K)
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 100, add = TRUE, col = 2)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 100, add = TRUE, lty=2, col = 2)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 100, add = TRUE, lty=2, col = 2)
+
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 200, add = TRUE, col = 3)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 200, add = TRUE, lty=2, col = 3)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 200, add = TRUE, lty=2, col = 3)
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 300, add = TRUE, col = 4)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 300, add = TRUE, lty=2, col = 4)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 300, add = TRUE, lty=2, col = 4)
+
+
+```
+
+# Model4 
+- Model K with SL, S, dK wby stratifying by T
+- Correlation between SL and S 
+- Model S with dS and y
+- Model SL with Y 
+- Y is normal? uniform? 
+
+
+
+```{r m4}
+
+16000 - 2400
+# starting from -80
+# 16000 to 10000 -> +30/5000 = 3/500
+# 10000 to 7000 -> + 60 / 3000 = 10/500
+# 7000 to 6000 -> + 4
+# 6000 to 3000 -> - 5 / 3000 = -1 / 500
+# 3000 to 2400 -> -5 / 500
+
+
+curve((x +16)* 30/ 6 - 80, from = -16, to = -10, col = 2, xlim=c(-16.000, -2.400), ylim=c(-85, 10))
+curve((x + 10) * 60/ 3 - 50, from = -10, to = -7.3, col = 2, add=TRUE)
+lines(x=c(-7.3, -6), y = c(4, 4), col = 2,  add=TRUE) # -7.3 to 6
+curve((x + 6) * (-5)/ 3 + 4, from = -6, to = -3, col = 2, add=TRUE)
+curve((x + 3) * (-5)/ 0.5 - 1, from = -3, to = -2.4, col = 2, add=TRUE)
+
+m4<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+
+        vector[25]: a<-a_bar + siga * za[T],
+        za[T]~dnorm(0,1),
+        a_bar~dnorm(0,1),
+        siga ~ dexp(1),
+
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+
+        matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        SL_bar~dnorm(0.12, 0.1),
+        S_bar~dnorm(1.4, 0.5),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+
+        b_dK~dexp(1), # don't need regularization
+        U~dexp(1),
+
+        # Model S 
+        S~dnorm(muS, sigmaS),
+        muS <- a2[T] - b_dS * dS + b_Y[T] * Y[T],
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        za2[T]~dnorm(0,1),
+        a2_bar~dnorm(0,1),
+        siga2 ~ dexp(1),
+
+        b_dS~dexp(1),
+        vector[25]: b_Y<-b_Y_bar + sigy * zy[T],
+        b_Y_bar~dnorm(0, 1),
+        sigy~dexp(1),
+        zy[T]~dnorm(0,1),
+
+        sigmaS~dexp(1), 
+
+        # Model SL 
+        SL | Y[T]< -10.000 ~dnorm((Y[T] +16)* 30/ 6 - 80, sigmaSL),
+        SL | Y[T]< -7.300 ~dnorm((Y[T] + 10) * 60/ 3 - 50, sigmaSL),
+        SL | Y[T]< -6.000~dnorm(4, sigmaSL),
+        SL | Y[T]< -3.000 ~dnorm((Y[T] + 6) * (-5)/ 3 + 4, sigmaSL),
+        SL | Y[T]< -2.400 ~dnorm((Y[T] + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        sigmaSL ~ dexp(1),
+
+        # Model Y
+        vector[25]: Y~dunif(2.400, 16.000)
+
+
+    ), dat = d, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+precis(m4, depth=2)
+dashboard(m4)
+
+# Posterior Check
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m4)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+
+# Prediction model
+means<-NULL
+PIs<-NULL
+means$a <- apply( post$a , 2 , mean )
+means$b_SL <- apply( post$b_SL , 2 , mean )
+
+means$b_S <- apply( post$b_S , 2 , mean )
+means$b_dK <- apply( post$b_dK , 2 , mean )
+
+plot(SL, K)
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 100, add = TRUE, col = 2)
+PIs$a <- apply( post$a , 2 , PI )
+PIs$b_SL <- apply( post$b_SL , 2 , PI )
+PIs$b_S <- apply( post$b_S , 2 , PI )
+PIs$b_dK <- apply( post$b_dK , 2 , PI )
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 100, add = TRUE, lty=2, col = 2)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 100, add = TRUE, lty=2, col = 2)
+
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 200, add = TRUE, col = 3)
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 200, add = TRUE, lty=2, col = 3)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 200, add = TRUE, lty=2, col = 3)
+curve(means$a + means$b_SL * x + means$b_S * 0.3 - means$b_dK * 300, add = TRUE, col = 4)
+curve(PIs$a[1] + PIs$b_SL[1] * x + PIs$b_S[1] * 0.3 - PIs$b_dK[1] * 300, add = TRUE, lty=2, col = 4)
+curve(PIs$a[2] + PIs$b_SL[2] * x + PIs$b_S[2] * 0.3 - PIs$b_dK[2] * 300, add = TRUE, lty=2, col = 4)
+
+
+plot(S, K)
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 100, add = TRUE, col = 2)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 100, add = TRUE, lty=2, col = 2)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 100, add = TRUE, lty=2, col = 2)
+
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 200, add = TRUE, col = 3)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 200, add = TRUE, lty=2, col = 3)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 200, add = TRUE, lty=2, col = 3)
+curve(means$a + means$b_SL * 0 + means$b_S * x - means$b_dK * 300, add = TRUE, col = 4)
+curve(PIs$a[1] + PIs$b_SL[1] * 0 + PIs$b_S[1] * x - PIs$b_dK[1] * 300, add = TRUE, lty=2, col = 4)
+curve(PIs$a[2] + PIs$b_SL[2] * 0 + PIs$b_S[2] * x - PIs$b_dK[2] * 300, add = TRUE, lty=2, col = 4)
+
+rm(list=ls())
+
+```
+
+
+# Standardized data
+
+```{r d2}
+
+curve((x +16)* 30/ 6 - 80, from = -16, to = -10, col = 2, xlim=c(-16.000, -2.400), ylim=c(-85, 10))
+curve((x + 10) * 60/ 3 - 50, from = -10, to = -7.3, col = 2, add=TRUE)
+lines(x=c(-7.3, -6), y = c(4, 4), col = 2,  add=TRUE) # -7.3 to 6
+curve((x + 6) * (-5)/ 3 + 4, from = -6, to = -3, col = 2, add=TRUE)
+curve((x + 3) * (-5)/ 0.5 - 1, from = -3, to = -2.4, col = 2, add=TRUE)
+
+
+T<- round(runif(200, 1,25)) 
+SL<-NULL # m
+for (i in 1:length(T)) SL[i]<- rnorm(1, - (1/ 40 )*(T[i] - 12.5)^2 + 2, 0.5)
+plot(T, SL)
+
+dS<-rbeta(length(T), 1.2,1) * 200 # km
+S<-NULL
+for(i in 1:length(T))S[i] <- rnorm(1, - 0.05*(T[i]-13) ^2 -dS[i]/100 + 15, 1)/17
+plot(density(S))
+plot(dS, S)
+points(dS[T==2], S[T==2], col = 2, lwd =3)
+points(dS[T==13], S[T==13], col = 3, lwd =3)
+points(dS[T==7], S[T==7], col = 4, lwd =3)
+plot(T, S)
+plot(T, dS)
+
+
+dK<-rbeta(length(T), 1.4,1)*400
+K<-NULL
+for(i in 1:length(T))K[i] <- rnorm(1, 4*SL[i] + 0.01* (T[i]-13)^2 + 75* S[i]- dK[i]/16, 1)/90
+
+
+# Standardize
+
+
+length(standardize(SL))
+length((T - mean(T))/sd(T))
+
+
+d2<-list(T=T, SL=standardize(SL), dS=standardize(dS), S=standardize(S), K=standardize(K), dK=standardize(dK))
+d2
+
+plot(density(d2$K))
+plot(d2$dK, d2$K)
+plot(d2$SL, d2$K)
+plot(d2$T, d2$K)
+plot(d2$S, d2$K)
+plot(d2$dS, d2$K)
+plot(d2$dS, d2$S)
+
+
+```
+
+```{r m5}
+m5<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+
+        vector[25]: a<-a_bar + siga * za[T],
+        za[T]~dnorm(0,1),
+        a_bar~dnorm(-0.5,0.5),
+        siga ~ dexp(1),
+
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+
+        matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        SL_bar~dnorm(0.12, 0.1),
+        S_bar~dnorm(1.4, 0.5),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+
+        b_dK~dexp(1), # don't need regularization
+        U~dexp(1),
+
+        # Model S 
+        S~dnorm(muS, sigmaS),
+        muS <- a2[T] - b_dS * dS + b_Y[T] * Y[T],
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        za2[T]~dnorm(0,1),
+        a2_bar~dnorm(0,0.1),
+        siga2 ~ dexp(1),
+
+        b_dS~dexp(1),
+        vector[25]: b_Y<-b_Y_bar + sigy * zy[T],
+        b_Y_bar~dnorm(0, 1),
+        sigy~dexp(1),
+        zy[T]~dnorm(0,1),
+
+        sigmaS~dexp(1), 
+
+        # Model SL 
+        SL | Y[T]< -10.000 ~dnorm((Y[T] +16)* 30/ 6 - 80, sigmaSL),
+        SL | Y[T]< -7.300 ~dnorm((Y[T] + 10) * 60/ 3 - 50, sigmaSL),
+        SL | Y[T]< -6.000~dnorm(4, sigmaSL),
+        SL | Y[T]< -3.000 ~dnorm((Y[T] + 6) * (-5)/ 3 + 4, sigmaSL),
+        SL | Y[T]< -2.400 ~dnorm((Y[T] + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        sigmaSL ~ dexp(1),
+
+        # Model Y
+        vector[25]: Y~dunif(2.400, 16.000)
+
+
+    ), dat = d2, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m5)
+precis(m5, depth=2)
+
+# Posterior Check
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m5)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+# Prediction model
+means<-NULL
+PIs<-NULL
+means$a <- apply( post$a , 2 , mean )
+means$b_SL <- apply( post$b_SL , 2 , mean )
+
+means$b_S <- apply( post$b_S , 2 , mean )
+means$b_dK <- apply( post$b_dK , 2 , mean )
+
+plot(d2$SL, d2$K)
+points(d2$SL[T==2], d2$K[T==2], col = 2, lwd=3)
+PIs$a <- apply( post$a , 2 , PI )
+PIs$b_SL <- apply( post$b_SL , 2 , PI )
+PIs$b_S <- apply( post$b_S , 2 , PI )
+PIs$b_dK <- apply( post$b_dK , 2 , PI )
+curve(means$a[2] + means$b_SL[2] * x + means$b_S[2] * mean(d2$S[T==2]) - means$b_dK * (mean(d2$dK[T==2])), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * x + PIs$b_S[1,2] * (mean(d2$S[T==2])) - PIs$b_dK[1] * (mean(d2$dK[T==2])), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * x + PIs$b_S[2,2] * (mean(d2$S[T==2])) - PIs$b_dK[2] * (mean(d2$dK[T==2])), add = TRUE, lty=2, col = 2)
+
+
+# Messy Plot
+for(i in 1:25){
+points(d2$SL[T==i], d2$K[T==i], col = i, lwd=3)
+curve(means$a[i] + means$b_SL[i] * x + means$b_S[i] * mean(d2$S[T==i]) - means$b_dK * mean(d2$dK[T==i]), add = TRUE, col = i)
+curve(PIs$a[1,i] + PIs$b_SL[1,i] * x + PIs$b_S[1,i] * mean(d2$S[T==i]) - PIs$b_dK[1,] * mean(d2$dK[T==i]), add = TRUE, lty=2, col = i)
+curve(PIs$a[2,i] + PIs$b_SL[2,i] * x + PIs$b_S[2,i] * mean(d2$S[T==i]) - PIs$b_dK[2,] * mean(d2$dK[T==i]), add = TRUE, lty=2, col = i)
+
+}
+
+
+plot(d2$S, d2$K)
+points(d2$S[T==2], d2$K[T==2], col =2, lwd = 2)
+curve(means$a[2] + means$b_SL[2] * mean(d2$SL[T==2]) + means$b_S[2] * x - means$b_dK * mean(d2$dK), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * mean(d2$SL[T==2]) + PIs$b_S[1,2] * x - PIs$b_dK[1] *  mean(d2$dK), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * mean(d2$SL[T==2]) + PIs$b_S[2,2] * x - PIs$b_dK[2] *  mean(d2$dK), add = TRUE, lty=2, col = 2)
+
+
+
+# do not feed in the array in the curve function 
+a<-0:100
+curve(a*x)
+curve(a*x, xlim=c(0, 10))
+curve(a*x, xlim=c(0, 20))
+a<-1:10
+curve(a*x)
+
+
+
+rm(list=ls())
+```
+
+
+```{r m6}
+library("rethinking")
+m6<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S + b_Y[T] * Y[T] - b_dK * dK, # regularization
+
+        vector[25]: a<-a_bar + siga * za[T],
+        za[T]~dnorm(0,1),
+        a_bar~dnorm(-0.5,0.5),
+        siga ~ dexp(1),
+
+        vector[25]: b_Y<-b_Y_bar + sigb_Y * zb_Y[T],
+        zb_Y[T]~dnorm(0,1),
+        b_Y_bar~dnorm(0.5,0.5),
+        sigb_Y ~ dexp(1),
+
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+
+        matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        SL_bar~dnorm(0.12, 0.1),
+        S_bar~dnorm(1.4, 0.5),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+
+
+        b_dK~dexp(1), # don't need regularization
+        U~dexp(1),
+
+        # Model S 
+        S~dnorm(muS, sigmaS),
+        muS <- a2[T] - b_dS * dS + b_Y_S[T] * Y[T],
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        za2[T]~dnorm(0,1),
+        a2_bar~dnorm(0,0.1),
+        siga2 ~ dexp(1),
+
+        b_dS~dexp(1),
+        vector[25]: b_Y_S<-b_Y_S_bar + sigys * zys[T],
+        b_Y_S_bar~dnorm(0, 1),
+        sigys~dexp(1),
+        zys[T]~dnorm(0,1),
+
+        sigmaS~dexp(1), 
+
+        # Model SL 
+        SL | Y[T] < -16.000 ~dnorm(- 80, sigmaSL),
+        SL | Y[T] > -16.000 && Y[T]< -10.000 ~dnorm((Y[T] +16)* 30/ 6 - 80, sigmaSL),
+        SL | Y[T] > -10.000 && Y[T]< -7.300 ~dnorm((Y[T] + 10) * 60/ 3 - 50, sigmaSL),
+        SL | Y[T] > -7.300 && Y[T]< -6.000~dnorm(4, sigmaSL),
+        SL | Y[T] > -6.000 && Y[T]< -3.000 ~dnorm((Y[T] + 6) * (-5)/ 3 + 4, sigmaSL),
+        SL | Y[T] > -3.000 && Y[T]< -2.400 ~dnorm((Y[T] + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        # SL | Y[T] > -16.000 && Y[T]< -10.000 ~dnorm((-13 +16)* 30/ 6 - 80, sigmaSL),
+        # SL | Y[T] > -10.000 && Y[T]< -7.300 ~dnorm((-8.6 + 10) * 60/ 3 - 50, sigmaSL),
+        # SL | Y[T] > -7.300 && Y[T]< -6.000~dnorm(4, sigmaSL),
+        # SL | Y[T] > -6.000 && Y[T]< -3.000 ~dnorm((-4.5 + 6) * (-5)/ 3 + 4, sigmaSL),
+        # SL | Y[T] > -3.000 && Y[T]< -2.400 ~dnorm((-2.7 + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        SL | Y[T] > -2.400 ~dnorm(0, sigmaSL),
+        sigmaSL ~ dexp(10),
+
+       # Model Y scale it to 0 to 1 
+        vector[25]: Y~dunif(-16.000, -2.400)
+
+
+    ), dat = d2, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m6)
+precis(m6, depth=2)
+
+curve(dexp(x,8))
+# Posterior Check
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=3 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m6)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+# Prediction model
+means<-NULL
+PIs<-NULL
+means$a <- apply( post$a , 2 , mean )
+means$b_SL <- apply( post$b_SL , 2 , mean )
+
+means$b_S <- apply( post$b_S , 2 , mean )
+means$b_dK <- apply( post$b_dK , 2 , mean )
+
+means$b_Y <- apply( post$b_Y , 2 , mean )
+means$Y <- apply( post$Y , 2 , mean )
+
+PIs$a <- apply( post$a , 2 , PI )
+PIs$b_SL <- apply( post$b_SL , 2 , PI )
+PIs$b_S <- apply( post$b_S , 2 , PI )
+PIs$b_dK <- apply( post$b_dK , 2 , PI )
+PIs$b_Y <- apply( post$b_Y , 2 , PI )
+PIs$Y <- apply( post$Y , 2 , PI )
+
+plot(d2$SL, d2$K)
+points(d2$SL[T==2], d2$K[T==2], col = 2, lwd=3)
+curve(means$a[2] + means$b_SL[2] * x + means$b_S[2] * mean(d2$S[T==2]) + means$b_Y[2] * means$Y[2] - means$b_dK * (mean(d2$dK[T==2])), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * x + PIs$b_S[1,2] * (mean(d2$S[T==2])) + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1] * (mean(d2$dK[T==2])), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * x + PIs$b_S[2,2] * (mean(d2$S[T==2])) + PIs$b_Y[2,2] * PIs$Y[2,2] - PIs$b_dK[2] * (mean(d2$dK[T==2])), add = TRUE, lty=2, col = 2)
+
+
+# Messy Plot
+for(i in 1:25){
+points(d2$SL[T==i], d2$K[T==i], col = i, lwd=3)
+curve(means$a[i] + means$b_SL[i] * x + means$b_S[i] * mean(d2$S[T==i]) + means$b_Y[2] * means$Y[2] - means$b_dK * mean(d2$dK[T==i]), add = TRUE, col = i)
+curve(PIs$a[1,i] + PIs$b_SL[1,i] * x + PIs$b_S[1,i] * mean(d2$S[T==i]) + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1,] * mean(d2$dK[T==i]), add = TRUE, lty=2, col = i)
+curve(PIs$a[2,i] + PIs$b_SL[2,i] * x + PIs$b_S[2,i] * mean(d2$S[T==i]) + PIs$b_Y[2,2] * PIs$Y[2,2] - PIs$b_dK[2,] * mean(d2$dK[T==i]), add = TRUE, lty=2, col = i)
+
+}
+
+
+plot(d2$S, d2$K)
+points(d2$S[T==2], d2$K[T==2], col =2, lwd = 2)
+curve(means$a[2] + means$b_SL[2] * mean(d2$SL[T==2]) + means$b_S[2] * x + means$b_Y[2] * means$Y[2] - means$b_dK * mean(d2$dK), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * mean(d2$SL[T==2]) + PIs$b_S[1,2] * x + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1] *  mean(d2$dK), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * mean(d2$SL[T==2]) + PIs$b_S[2,2] * x + PIs$b_Y[2,2] * PIs$Y[1,2] - PIs$b_dK[2] *  mean(d2$dK), add = TRUE, lty=2, col = 2)
+
+
+
+
+# using sim?
+n<-2000
+
+length(post$a[,1])
+dam<-rnorm(n, 
+        mean = post$a[,1] + post$b_SL[,1] * d2$SL[T==1] + post$b_S[,1] * mean(d2$S[T==1]) + post$b_Y[,1] * post$Y[,1] - post$b_dK[1] * mean(d2$dK[T==1]), 
+        sd = post$U)
+mean <- post$a[,1] + post$b_SL[,1] * rep(mean(d2$SL[T==1]), 2000) + post$b_S[,1] * ran + post$b_Y[,1] * post$Y[,1] - post$b_dK[1] * rep(mean(d2$dK), 2000)
+length(dam)
+dens(dam)
+plot(ran, mean)
+plot(ran, dam)
+simK<-matrix(NA, nrow = 25, ncol = n) 
+for(i in 1:25){
+    # I just put d2$variable[T==i] but might want to be mean()
+    simK[i,]<-rnorm(n, # n == length(post)
+        mean = post$a[,i] + post$b_SL[,i] * mean(d2$SL[T==i]) + post$b_S[,i] * mean(d2$S[T==i]) + post$b_Y[,i] * post$Y[,i] - post$b_dK[i] * mean(d2$dK[T==i]), 
+        sd = post$U)
+}
+
+length(simK[2])
+
+apply(matrix(simK[1,]), 2, PI )
+apply(matrix(simK[2,]), 2, PI )
+apply(matrix(simK[3,]), 2, PI )
+apply(matrix(simK[4,]), 2, PI )
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+length(sim_PI)
+sim_PI[1,1]- sim_PI[1,2]
+sim_PI[2,1]- sim_PI[2,2]
+sim_PI[3,1]- sim_PI[3,2]
+
+plot(d2$T, d2$K)
+points(1:25, sim_PI[,1],col=2, lwd = 3)
+points(1:25, sim_PI[,2], col=2, lwd =3)
+
+for(i in 1:25)lines(c(i,i), sim_PI[i,1:2], col =2, lwd = 2)
+
+
+
+# This does not work
+dens(post$b_S)
+dens(post$b_SL)
+dens(d2$SL)
+Sseq<-seq(-3, 3, len = 100)
+mu<-sim(m6,data=list(SL=Sseq, T = rep(0, 100), S = rep(1, 100), dK = rep(1, 100), dS = rep(1, 100)))
+
+
+
+# for SL when T ==2
+simK<-matrix(NA, nrow = 20, ncol = n) 
+range(SL)
+sSL<-seq(-2.5, 3, len=20)
+sSL[1]
+for(j in 1:20){
+    # I just put d2$variable[T==i] but might want to be mean()
+    i <-2
+    simK[j,]<-rnorm(n, # n == length(post)
+        mean = post$a[,i] + post$b_SL[,i] * sSL[j] + post$b_S[,i] * mean(d2$S[T==i]) + post$b_Y[,i] * post$Y[,i] - post$b_dK[i] * mean(d2$dK[T==i]), 
+        sd = post$U)
+}
+
+length(simK[,1])
+
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+plot(d2$SL, d2$K)
+lines(sSL, sim_PI[,1],col=2, lwd = 3, lty=2)
+lines(sSL, sim_PI[,2],col=2, lwd = 3, lty=2)
+
+
+# everything10
+simK<-matrix(NA, nrow = 100, ncol = n*25) 
+sSL<-seq(-2.5, 3, len=100)
+for(j in 1:100){
+    # I just put d2$variable[T==i] but might want to be mean()    
+    simK[j,]<-rnorm(n*25, # n == length(post)
+        mean = array(post$a) + array(post$b_SL) * sSL[j] + array(post$b_S) * mean(d2$S) + array(post$b_Y) * array(post$Y) - array(rep(post$b_dK,25)) * mean(d2$dK), 
+        sd = post$U)
+}
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+
+plot(d2$SL, d2$K)
+lines(sSL, sim_PI[,1],col=2, lwd = 3, lty=2)
+lines(sSL, sim_PI[,2],col=2, lwd = 3, lty=2)
+
+
+rm(list=ls())
+```
+
+
+# This does not goes well, adjust the initial data by adding Y (hidden)
+
+```{r d3}
+library("rethinking")
+library(dplyr)
+myFunc <- function(x) {
+case_when(
+    -16.000 <= x && x <= -10   ~ (x + 16) * 30 / 6 - 80,
+    -10.000 < x  && x <= -7.300 ~ (x + 10) * 60 / 3 - 50,
+    -7.300 < x   && x <= -6    ~ 4,
+    -6.000 < x   && x <= -3.000 ~ (x + 6) * (-5) / 3 + 4,
+    -3.000 < x   && x <= -2.400 ~ (x + 3) * (-5) / 0.5 - 1,
+    TRUE                      ~ 1 # This acts as your final 'else'
+  )
+
+}
+curve(myFunc(x), col = 2, xlim=c(-16.000, -2.400), ylim=c(-85, 10))
+
+Y<- runif(200, -16, -2.4)
+T<- NULL
+SL<-NULL # m
+for (i in 1:length(Y)) {
+    T[i]<-rpois(1,  (Y[i]+16)/13.6 * 25)
+    if(T[i] < 1) {T[i]<- 1}
+    else if(T[i] > 25) {T[i]<- 25}
+    SL[i]<- rnorm(1, myFunc(Y[i]), 5)
+}
+plot(T, SL)
+plot(Y, T)
+plot(Y, SL)
+
+dS<-rbeta(length(T), 1.2,1) * 200 # km
+S<-NULL
+for(i in 1:length(T))S[i] <- rnorm(1, 0.3*Y[i] -dS[i]/50, 0.1)/10 + 1
+range(S)
+plot(density(S))
+plot(dS, S)
+points(dS[T==2], S[T==2], col = 2, lwd =4)
+points(dS[T==13], S[T==13], col = 3, lwd =4)
+points(dS[T==7], S[T==7], col = 4, lwd =4)
+plot(T, S)
+plot(Y, S)
+plot(T, dS)
+
+
+dK<-rbeta(length(T), 1.4,1)*400
+K<-NULL
+for(i in 1:length(T)){
+    K[i] <- rnorm(1, 0.2*SL[i] + 0.02* Y[i] + 0.2* S[i]- dK[i]/50, 0.1)/45 + 0.8
+    K[i]<- K[i] / (K[i] + S[i])
+    S[i]<- S[i] / (K[i] + S[i])
+    }
+range(K)
+plot(density(K))
+plot(dK, K)
+plot(SL, K)
+plot(T, K)
+plot(Y, K)
+plot(S, K)
+points(S[T==2], K[T==2], col = 2, lwd =4)
+points(S[T==13], K[T==13], col = 3, lwd =4)
+points(S[T==7], K[T==7], col = 4, lwd =4)
+plot(dS, K)
+
+# Standardize
+length(standardize(SL))
+length((T - mean(T))/sd(T))
+
+
+d3<-list(T=T, SL=standardize(SL), dS=standardize(dS), S=S, K=K, dK=standardize(dK))
+#d2
+
+plot(density(d3$K))
+plot(d3$dK, d3$K)
+plot(d3$SL, d3$K)
+plot(d3$T, d3$K)
+plot(d3$S, d3$K)
+plot(d3$dS, d3$K)
+plot(d3$dS, d3$S)
+plot(Y, d3$S)
+
+
+```
+
+```{r m7}
+library("rethinking")
+
+plot(d3$S, d3$SL)
+points(d3$S[T==2], d3$SL[T==2], col = 2, lwd = 4)
+points(d3$S[T==3], d3$SL[T==3], col = 3, lwd = 4)
+points(d3$S[T==4], d3$SL[T==4], col = 5, lwd = 4)
+m7<- ulam(
+    alist (
+        K~normal(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S + b_Y[T] * Y[T] - b_dK * dK, # regularization
+
+        # We do not know anything about this. 
+        # mean should start at 0 and has small variation 
+        vector[25]: a<-a_bar + siga * za[T],
+        a_bar~normal(0,0.5),
+        siga ~ exponential(1),
+        za[T]~normal(0,0.3),
+
+        # In the same T, we do not know how Y changes, although it would be close to each other 
+        vector[25]: b_Y<-b_Y_bar + sigb_Y * zb_Y[T],
+        b_Y_bar~normal(0,0.5),
+        sigb_Y ~ exponential(1),
+        zb_Y[T]~normal(0,0.3),
+
+
+        # We want to get SL and S positively correlated to K, 
+        # but we do not know for sure without data. 
+        # this is not too strong correlation, huh? 
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+        matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        SL_bar~normal(0, 0.5),
+        S_bar~normal(0, 0.5),
+        corr_matrix[2]:Rho ~lkj_corr(5),
+        vector[2]: sigma ~exponential(1),
+
+        # don't need regularization
+        # We are hoping/believing b_dK is positive 
+        b_dK~normal(0, 0.5), 
+        U~exponential(1),
+
+        # Model S 
+        S~normal(muS, sigmaS),
+        muS <- a2[T] - b_dS * dS + b_Y_S[T] * Y[T],
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        a2_bar~normal(0,0.5), 
+        siga2 ~ exponential(1),
+        za2[T]~normal(0,0.3),
+
+        # We are hoping/believing b_dK is positive 
+        b_dS~normal(0,0.5),
+
+        vector[25]: b_Y_S<-b_Y_S_bar + sigys * zys[T],
+        b_Y_S_bar~normal(0, 0.5),
+        sigys~exponential(1),
+        zys[T]~normal(0,0.3),
+
+        sigmaS~exponential(1), 
+
+        # Model SL 
+        SL | Y[T] < -16.000 ~normal(- 80, sigmaSL),
+        SL | Y[T] >= -16.000 && Y[T]<= -10.000 ~normal((Y[T] +16)* 30/ 6 - 80, sigmaSL),
+        SL | Y[T] > -10.000 && Y[T]<= -7.300 ~normal((Y[T] + 10) * 60/ 3 - 50, sigmaSL),
+        SL | Y[T] > -7.300 && Y[T]<= -6.000~normal(4, sigmaSL),
+        SL | Y[T] > -6.000 && Y[T]<= -3.000 ~normal((Y[T] + 6) * (-5)/ 3 + 4, sigmaSL),
+        SL | Y[T] > -3.000 && Y[T]<= -2.400 ~normal((Y[T] + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        # SL | Y[T] > -16.000 && Y[T]< -10.000 ~dnorm((-13 +16)* 30/ 6 - 80, sigmaSL),
+        # SL | Y[T] > -10.000 && Y[T]< -7.300 ~dnorm((-8.6 + 10) * 60/ 3 - 50, sigmaSL),
+        # SL | Y[T] > -7.300 && Y[T]< -6.000~dnorm(4, sigmaSL),
+        # SL | Y[T] > -6.000 && Y[T]< -3.000 ~dnorm((-4.5 + 6) * (-5)/ 3 + 4, sigmaSL),
+        # SL | Y[T] > -3.000 && Y[T]< -2.400 ~dnorm((-2.7 + 3) * (-5)/ 0.5 - 1, sigmaSL),
+        SL | Y[T] > -2.400 ~normal(0, sigmaSL),
+        sigmaSL ~ exponential(10),
+
+# CHECKKKK
+       # Model Y scale it to 0 to 1 
+        vector[25]: Y~uniform(-16.000, -2.400)
+
+
+    ), dat = d3, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m7)
+precis(m7, depth=2)
+
+# Posterior Check
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=3 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m7)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+# Prediction model
+means<-NULL
+PIs<-NULL
+means$a <- apply( post$a , 2 , mean )
+means$b_SL <- apply( post$b_SL , 2 , mean )
+
+means$b_S <- apply( post$b_S , 2 , mean )
+means$b_dK <- apply( post$b_dK , 2 , mean )
+
+means$b_Y <- apply( post$b_Y , 2 , mean )
+means$Y <- apply( post$Y , 2 , mean )
+
+PIs$a <- apply( post$a , 2 , PI )
+PIs$b_SL <- apply( post$b_SL , 2 , PI )
+PIs$b_S <- apply( post$b_S , 2 , PI )
+PIs$b_dK <- apply( post$b_dK , 2 , PI )
+PIs$b_Y <- apply( post$b_Y , 2 , PI )
+PIs$Y <- apply( post$Y , 2 , PI )
+
+plot(d3$SL, d3$K)
+points(d3$SL[T==2], d3$K[T==2], col = 2, lwd=3)
+curve(means$a[2] + means$b_SL[2] * x + means$b_S[2] * mean(d3$S[T==2]) + means$b_Y[2] * means$Y[2] - means$b_dK * (mean(d3$dK[T==2])), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * x + PIs$b_S[1,2] * (mean(d3$S[T==2])) + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1] * (mean(d3$dK[T==2])), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * x + PIs$b_S[2,2] * (mean(d3$S[T==2])) + PIs$b_Y[2,2] * PIs$Y[2,2] - PIs$b_dK[2] * (mean(d3$dK[T==2])), add = TRUE, lty=2, col = 2)
+
+
+# Messy Plot
+for(i in 1:25){
+points(d3$SL[T==i], d3$K[T==i], col = i, lwd=3)
+curve(means$a[i] + means$b_SL[i] * x + means$b_S[i] * mean(d3$S[T==i]) + means$b_Y[2] * means$Y[2] - means$b_dK * mean(d3$dK[T==i]), add = TRUE, col = i)
+curve(PIs$a[1,i] + PIs$b_SL[1,i] * x + PIs$b_S[1,i] * mean(d3$S[T==i]) + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1,] * mean(d3$dK[T==i]), add = TRUE, lty=2, col = i)
+curve(PIs$a[2,i] + PIs$b_SL[2,i] * x + PIs$b_S[2,i] * mean(d3$S[T==i]) + PIs$b_Y[2,2] * PIs$Y[2,2] - PIs$b_dK[2,] * mean(d3$dK[T==i]), add = TRUE, lty=2, col = i)
+
+}
+
+
+plot(d3$S, d3$K)
+points(d3$S[T==2], d3$K[T==2], col =2, lwd = 2)
+curve(means$a[2] + means$b_SL[2] * mean(d3$SL[T==2]) + means$b_S[2] * x + means$b_Y[2] * means$Y[2] - means$b_dK * mean(d3$dK), add = TRUE, col = 2)
+curve(PIs$a[1,2] + PIs$b_SL[1,2] * mean(d3$SL[T==2]) + PIs$b_S[1,2] * x + PIs$b_Y[1,2] * PIs$Y[1,2] - PIs$b_dK[1] *  mean(d3$dK), add = TRUE, lty=2, col = 2)
+curve(PIs$a[2,2] + PIs$b_SL[2,2] * mean(d3$SL[T==2]) + PIs$b_S[2,2] * x + PIs$b_Y[2,2] * PIs$Y[1,2] - PIs$b_dK[2] *  mean(d3$dK), add = TRUE, lty=2, col = 2)
+
+
+
+
+# using sim?
+n<-2000
+
+length(post$a[,1])
+dam<-rnorm(n, 
+        mean = post$a[,1] + post$b_SL[,1] * d2$SL[T==1] + post$b_S[,1] * mean(d2$S[T==1]) + post$b_Y[,1] * post$Y[,1] - post$b_dK[1] * mean(d2$dK[T==1]), 
+        sd = post$U)
+mean <- post$a[,1] + post$b_SL[,1] * rep(mean(d2$SL[T==1]), 2000) + post$b_S[,1] * ran + post$b_Y[,1] * post$Y[,1] - post$b_dK[1] * rep(mean(d2$dK), 2000)
+length(dam)
+dens(dam)
+plot(ran, mean)
+plot(ran, dam)
+simK<-matrix(NA, nrow = 25, ncol = n) 
+for(i in 1:25){
+    # I just put d2$variable[T==i] but might want to be mean()
+    simK[i,]<-rnorm(n, # n == length(post)
+        mean = post$a[,i] + post$b_SL[,i] * mean(d2$SL[T==i]) + post$b_S[,i] * mean(d2$S[T==i]) + post$b_Y[,i] * post$Y[,i] - post$b_dK[i] * mean(d2$dK[T==i]), 
+        sd = post$U)
+}
+
+length(simK[2])
+
+apply(matrix(simK[1,]), 2, PI )
+apply(matrix(simK[2,]), 2, PI )
+apply(matrix(simK[3,]), 2, PI )
+apply(matrix(simK[4,]), 2, PI )
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+length(sim_PI)
+sim_PI[1,1]- sim_PI[1,2]
+sim_PI[2,1]- sim_PI[2,2]
+sim_PI[3,1]- sim_PI[3,2]
+
+plot(d2$T, d2$K)
+points(1:25, sim_PI[,1],col=2, lwd = 3)
+points(1:25, sim_PI[,2], col=2, lwd =3)
+
+for(i in 1:25)lines(c(i,i), sim_PI[i,1:2], col =2, lwd = 2)
+
+
+
+# This does not work
+dens(post$b_S)
+dens(post$b_SL)
+dens(d2$SL)
+Sseq<-seq(-3, 3, len = 100)
+mu<-sim(m6,data=list(SL=Sseq, T = rep(0, 100), S = rep(1, 100), dK = rep(1, 100), dS = rep(1, 100)))
+
+
+
+# for SL when T ==2
+simK<-matrix(NA, nrow = 20, ncol = n) 
+range(SL)
+sSL<-seq(-2.5, 3, len=20)
+sSL[1]
+for(j in 1:20){
+    # I just put d2$variable[T==i] but might want to be mean()
+    i <-2
+    simK[j,]<-rnorm(n, # n == length(post)
+        mean = post$a[,i] + post$b_SL[,i] * sSL[j] + post$b_S[,i] * mean(d2$S[T==i]) + post$b_Y[,i] * post$Y[,i] - post$b_dK[i] * mean(d2$dK[T==i]), 
+        sd = post$U)
+}
+
+length(simK[,1])
+
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+plot(d2$SL, d2$K)
+lines(sSL, sim_PI[,1],col=2, lwd = 3, lty=2)
+lines(sSL, sim_PI[,2],col=2, lwd = 3, lty=2)
+
+
+# everything10
+simK<-matrix(NA, nrow = 100, ncol = n*25) 
+sSL<-seq(-2.5, 3, len=100)
+for(j in 1:100){
+    # I just put d2$variable[T==i] but might want to be mean()    
+    simK[j,]<-rnorm(n*25, # n == length(post)
+        mean = array(post$a) + array(post$b_SL) * sSL[j] + array(post$b_S) * mean(d2$S) + array(post$b_Y) * array(post$Y) - array(rep(post$b_dK,25)) * mean(d2$dK), 
+        sd = post$U)
+}
+sim_PI <- apply(simK, 1, PI )
+sim_PI <- t(sim_PI)
+
+
+plot(d2$SL, d2$K)
+lines(sSL, sim_PI[,1],col=2, lwd = 3, lty=2)
+lines(sSL, sim_PI[,2],col=2, lwd = 3, lty=2)
+
+
+rm(list=ls())
+```
+# 7 does not work as it tries to model Y 
+
+without Y and no correlation, but does not hide SL
+```{r m8}
+library("rethinking")
+
+plot(d3$S, d3$SL)
+points(d3$S[T==2], d3$SL[T==2], col = 2, lwd = 4)
+points(d3$S[T==3], d3$SL[T==3], col = 3, lwd = 4)
+points(d3$S[T==4], d3$SL[T==4], col = 5, lwd = 4)
+m8<- ulam(
+    alist (
+        K~normal(mu, U), 
+        logit(mu) <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, 
+
+        # We do not know anything about this. 
+        # mean should start at 0 and has small variation 
+        vector[25]: a<-a_bar + siga * za[T],
+        a_bar~normal(0,0.3),
+        siga ~ exponential(1),
+        za[T]~normal(0,0.3),
+
+        # We want to get SL and S positively correlated to K due to Y 
+        # but we do not know for sure without data. 
+        # this is not too strong correlation, huh? 
+        # transpars>vector[25]:b_S<<-v[,1],
+        # transpars>vector[25]:b_SL<<-v[,2],
+
+        # matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        # SL_bar~normal(0, 0.2),
+        # S_bar~normal(0, 0.2),
+        # corr_matrix[2]:Rho ~lkj_corr(1),
+        # vector[2]: sigma ~exponential(1),
+
+        vector [25]: b_S~normal(0, 0.2),
+        vector [25]: b_SL~normal(0, 0.2),
+
+        # don't need regularization
+        # We are hoping/believing b_dK is positive 
+        b_dK~normal(0, 0.5),
+
+        U~exponential(1),
+
+        # Model S 
+        S~normal(muS, sigmaS),
+        logit(muS) <- a2[T] - b_dS * dS,
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        a2_bar~normal(0,0.3), 
+        siga2 ~ exponential(1),
+        za2[T]~normal(0,0.3),
+
+        # We are hoping/believing b_dS is positive 
+        b_dS~normal(0,0.5),
+
+        sigmaS~exponential(1)
+
+
+    ), dat = d3, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m8)
+precis(m8, depth=2)
+
+# Posterior Check
+post <- extract.samples(m8)
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m8)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+
+# using sim? or Other stuffs   
+
+
+plot(d3$SL, d3$K)
+SLseq<-seq(-2, 2, len = 20)
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(post$a + post$b_SL * i + post$b_S * mean(d3$S)))
+mean(KbySL[,1])
+PIs<- apply( KbySL , 2 , PI )
+means<- apply( KbySL , 2 , mean )
+lines(SLseq, means, col = 2, lwd = 3)
+lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+curve(inv_logit(mean(post$a_bar) + mean(post$b_SL) * x + mean(post$b_S) * mean(d3$S)), add=TRUE)
+
+b_SL[T] * SL + b_S[T] * S - b_dK * dK
+
+plot(d3$S, d3$K)
+Sseq<-seq(0, 0.75, len = 20)
+KbyS<- sapply(Sseq, 
+    function (i) inv_logit(post$a + post$b_S * i+ ))
+PIs<- apply( KbyS , 2 , PI )
+means<- apply( KbyS , 2 , mean )
+lines(Sseq, means, col = 2, lwd = 3)
+lines(Sseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+curve(inv_logit(mean(post$a_bar) + mean(post$b_S) * x), add=TRUE)
+
+plot(d3$dK, d3$K)
+dKseq<-seq(-2.5, 2, len = 20)
+KbydK<- sapply(dKseq, 
+    function (i) inv_logit(post$a - rep(post$b_dK, 25) * i + post$b_S * mean(d3$S)))
+PIs<- apply( KbydK , 2 , PI )
+means<- apply( KbydK , 2 , mean )
+lines(dKseq, means, col = 2, lwd = 3)
+lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
+plot(d3$dS, d3$S)
+dSseq<-seq(-2, 2, len = 20)
+SbydS<- sapply(dSseq, 
+    function (i) inv_logit(post$a2 - rep(post$b_dS, 25) * i ))
+PIs<- apply( SbydS , 2 , PI )
+means<- apply( SbydS , 2 , mean )
+lines(dSseq, means, col = 2, lwd = 3)
+lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
+rm(list=ls())
+```
+
+
+But we do not know SL from the data 
+
+one way: add SL for each T 
+
+
+another way: add Y 
+
+# One 
+
+```{r m9}
+library("rethinking")
+
+d4<- list(K=d3$K, T=d3$T, S=d3$S, dK=d3$dK, dS=d3$dS)
+
+plot(d4$T, d3$SL)
+curve(inv_logit(x - 10) + 10,xlim = c(-1, 10) )
+
+m9<- ulam(
+    alist (
+        K~normal(mu, U), 
+        logit(mu) <- a[T] + b_SL[T] * SL[T] + b_S[T] * S - b_dK * dK,
+
+        # We do not know anything about this. 
+        # mean should start at 0 and has small variation 
+        vector[25]: a<-a_bar + siga * za[T],
+        a_bar~normal(0,0.3),
+        siga ~ exponential(1),
+        za[T]~normal(0,0.3),
+
+
+        # We want to get SL and S positively correlated to K due to Y 
+        # but we do not know for sure without data. 
+        # this is not too strong correlation, huh? 
+        # transpars>vector[25]:b_S<<-v[,1],
+        # transpars>vector[25]:b_SL<<-v[,2],
+
+        # matrix[25, 2]:v ~multi_normal(c(SL_bar, S_bar), Rho, sigma),
+        # SL_bar~normal(0, 0.2),
+        # S_bar~normal(0, 0.2),
+        # corr_matrix[2]:Rho ~lkj_corr(1),
+        # vector[2]: sigma ~exponential(1),
+
+        vector [25]: b_S~normal(0, 0.2),
+        vector [25]: b_SL~normal(0, 0.2),
+
+
+        # don't need regularization
+        # We are hoping/believing b_dK is positive 
+        b_dK~normal(0, 0.5),
+        U~exponential(1),
+
+        # Model S 
+        S~normal(muS, sigmaS),
+        logit(muS) <- a2[T] - b_dS * dS,
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        a2_bar~normal(0,0.3), 
+        siga2 ~ exponential(1),
+        za2[T]~normal(0,0.3),
+
+        # We are hoping/believing b_dS is positive 
+        b_dS~normal(0,0.5),
+
+        sigmaS~exponential(1), 
+
+        # Model SL 
+        vector[25]:SL~normal( muSL , sigSL),
+        vector[25]:logit(muSL)<- aSL + T * b2_SL,
+        aSL~normal(-4, 0.1),
+        b2_SL~normal(0.3, 0.1),
+
+
+        sigSL~exponential(6)
+
+
+    ), dat = d4, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m9)
+precis(m9, depth=2)
+
+
+
+# Posterior Check
+post <- extract.samples(m9)
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m9)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+
+# using sim? or Other stuffs   
+
+# Scale SL between 0 and 1
+SL<-(d3$SL - min(d3$SL))/(max(d3$SL) - min(d3$SL))
+
+plot(SL, d3$K)
+SLseq<-seq(0, 1, len = 20)
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(mean(post$a) + post$b_SL * i + post$b_S * mean(d3$S)))
+mean(KbySL[,1])
+means<- apply( KbySL , 2 , mean )
+PIs<- apply( KbySL , 2 , PI )
+lines(SLseq, means, col = 2, lwd = 3)
+lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+curve(mean(post$a_bar) + mean(post$b_SL) * x + mean(post$b_S) * mean(d3$S), add=TRUE)
+
+
+plot(d3$S, d3$K)
+Sseq<-seq(0, 1, len = 20)
+KbyS<- sapply(Sseq, 
+    function (i) inv_logit(post$a + post$b_S * i))
+PIs<- apply( KbyS , 2 , PI )
+means<- apply( KbyS , 2 , mean )
+lines(Sseq, means, col = 2, lwd = 3)
+lines(Sseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+plot(d3$dK, d3$K)
+dKseq<-seq(-2.5, 2, len = 20)
+KbydK<- sapply(dKseq, 
+    function (i) inv_logit(post$a - rep(post$b_dK, 25) * i + post$b_S * mean(d3$S)))
+PIs<- apply( KbydK , 2 , PI )
+means<- apply( KbydK , 2 , mean )
+lines(dKseq, means, col = 2, lwd = 3)
+lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
+plot(d3$dS, d3$S)
+dSseq<-seq(-2, 2, len = 20)
+SbydS<- sapply(dSseq, 
+    function (i) inv_logit(post$a2 - rep(post$b_dS, 25) * i ))
+PIs<- apply( SbydS , 2 , PI )
+means<- apply( SbydS , 2 , mean )
+lines(dSseq, means, col = 2, lwd = 3)
+lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+# How about T and SL
+plot(d3$T, SL)
+dSseq<-1:25
+SLbyT<- sapply(dSseq, 
+    function (i) inv_logit(post$aSL + post$b2_SL * i ))
+head(post$aSL)
+PIs<- apply( SLbyT , 2 , PI )
+means<- apply( SLbyT , 2 , mean )
+lines(dSseq, means, col = 2, lwd = 3)
+lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+curve(inv_logit(0.3* x - 4), add = TRUE)
+
+# Scale the SL from 0 to 1 
+
+
+rm(list=ls())
+```
+
+
+
+# put the correlation information through y to hide SL 
+
+Then there are some correlation between S and SL, not knowing if it's Y or something else
+... this is ... Model 3 
+
+(still have to hide SL tho) 
+
+```{r m9}
+library("rethinking")
+
+plot(Y, d3$S)
+
+m9<- ulam(
+    alist (
+        K~normal(mu, U), 
+        logit(mu) <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK,
+
+        # We do not know anything about this. 
+        # mean should start at 0 and has small variation 
+        vector[25]: a<-a_bar + siga * za[T],
+        a_bar~normal(0,0.3),
+        siga ~ exponential(1),
+        za[T]~normal(0,0.3),
+
+
+        # We want to get SL and S positively correlated to K due to Y 
+        # but we do not know for sure without data. 
+        # this is not too strong correlation, huh? 
+        transpars>vector[25]:b_S<<-v[,1],
+        transpars>vector[25]:b_SL<<-v[,2],
+
+        matrix[25, 2]:v ~multi_normal(c(S_bar, SL_bar), Rho, sigma),
+        S_bar~normal(0, 0.2),
+        SL_bar~normal(0, 0.2),
+        corr_matrix[2]:Rho ~lkj_corr(1),
+        vector[2]: sigma ~exponential(1),
+
+
+        # don't need regularization
+        # We are hoping/believing b_dK is positive 
+        b_dK~normal(0, 0.5),
+        U~exponential(1),
+
+        # Model S 
+        S~normal(muS, sigmaS),
+        logit(muS) <- a2[T] - b_dS * dS,
+
+        vector[25]: a2<-a2_bar + siga2 * za2[T],
+        a2_bar~normal(0,0.3), 
+        siga2 ~ exponential(1),
+        za2[T]~normal(0,0.3),
+
+        # We are hoping/believing b_dS is positive 
+        b_dS~normal(0,0.5),
+
+        sigmaS~exponential(1)
+
+
+    ), dat = d3, chains=4, cores=4, log_lik=TRUE, 
+#    custom_block = my_stan_function
+)
+dashboard(m9)
+precis(m9, depth=2)
+
+# Posterior Check
+post <- extract.samples(m9)
+
+# Correlation?
+R <- rlkjcorr( 1e4 , K=2 , eta=2 )# eta min lkj_corr()
+plot(density( R[,1,2]), ylim = c(0, 1))
+
+post <- extract.samples(m9)
+dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
+
+
+# using sim? or Other stuffs   
+
+
+plot(d3$SL, d3$K)
+SLseq<-seq(-2, 2, len = 20)
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(mean(post$a) + post$b_SL * i + post$b_S * mean(d3$S)))
+mean(KbySL[,1])
+means<- apply( KbySL , 2 , mean )
+PIs<- apply( KbySL , 2 , PI )
+lines(SLseq, means, col = 2, lwd = 3)
+lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+curve(mean(post$a_bar) + mean(post$b_SL) * x + mean(post$b_S) * mean(d3$S), add=TRUE)
+
+
+plot(d3$S, d3$K)
+Sseq<-seq(0, 1, len = 20)
+KbyS<- sapply(Sseq, 
+    function (i) inv_logit(post$a + post$b_S * i))
+PIs<- apply( KbyS , 2 , PI )
+means<- apply( KbyS , 2 , mean )
+lines(Sseq, means, col = 2, lwd = 3)
+lines(Sseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+plot(d3$dK, d3$K)
+dKseq<-seq(-2.5, 2, len = 20)
+KbydK<- sapply(dKseq, 
+    function (i) inv_logit(post$a - rep(post$b_dK, 25) * i + post$b_S * mean(d3$S)))
+PIs<- apply( KbydK , 2 , PI )
+means<- apply( KbydK , 2 , mean )
+lines(dKseq, means, col = 2, lwd = 3)
+lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
+plot(d3$dS, d3$S)
+dSseq<-seq(-2, 2, len = 20)
+SbydS<- sapply(dSseq, 
+    function (i) inv_logit(post$a2 - rep(post$b_dS, 25) * i ))
+PIs<- apply( SbydS , 2 , PI )
+means<- apply( SbydS , 2 , mean )
+lines(dSseq, means, col = 2, lwd = 3)
+lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
+rm(list=ls())
+```
+⌈
+
+
+
+```{r m32}
+m32<- ulam(
+    alist (
+        K~dnorm(mu, U), 
+        mu <- a[T] + b_SL[T] * SL + b_S[T] * S - b_dK * dK, # regularization
+        a[T]~dnorm(0,1), 
+
+        save>vector[25]:b_S<<- b_S_bar + b_S_sig * v[,1],
+        save>vector[25]:b_SL<<- b_SL_bar + b_SL_sig * v[,2],
+
+        matrix[25, 2]:v ~multi_normal_cholesky(a_bar, Rho, sigma),
+        vector[2]: a_bar~dnorm(0, 1),
+        corr_matrix[2]:Rho ~lkj_corr(2),# this is not strong correlation, huh? 
+        vector[2]: sigma ~dexp(1),
+        c(b_S_bar, b_SL_bar)~dexp(0,1),
+        c(b_S_sig, b_SL_sig)~dexp(1),
+
+        b_dK~dexp(1), 
+        U~dexp(1),
+
+         S~dnorm(mu2, sigma2),
+         mu2 <- a_mu2[T] - b_mu2 * dS,
+         a_mu2[T]~dnorm(0, 1),
+         b_mu2~dexp(1),
+         sigma2~dexp(1)
+
+    ), dat = d, chains=4, cores=4, log_lik=TRUE, 
+    #custom_block = my_stan_function,
+)
+precis(m32, depth=2)
+dashboard(m32)
+
+```
+
+
+
+# No staratification
+```{r m}
+dum<-NULL
+for(i in 1:100) dum[i]<-rpois(1, (runif(1, -16 + 2.4) + 16 - 2.4 / (-2.4 + 16)))
+dum
+dens(dum)
+
+mT0<-ulam(
+    alist(
+         # Model T 
+        T~poisson((Y + 16)/ ( -2.4 + 16) * 25),
+
+        # Model T by Y 
+        vector[200]:Y ~ uniform( -16 , -2.4 )
+    ), dat = d, chain = 4, core = 4, log_lik = TRUE
+)
+
+mT1<-ulam(
+    alist(
+         # Model T 
+        T~normal((Y + 16)/ ( -2.4 + 16) * 25, 1),
+
+        # Model T by Y 
+        vector[200]:Y ~ uniform( -16 , -2.4 )
+    ), dat = d, chain = 4, core = 4, log_lik = TRUE
+)
+
+
+dashboard(mT0)
+precis(mT0, depth = 2)
+dashboard(mT1)
+precis(mT1, depth = 2)
+
+d$T
+post <- extract.samples(mT0)
+post1 <- extract.samples(mT1)
+p<-NULL
+p1<-NULL
+for(i in 1:200) {
+    p[i]<-mean(post$Y[,i])
+    p1[i]<-mean(post1$Y[,i])
+}
+
+plot(T, Y)
+points(T, p, col = 2)
+points(T, p1, col = 3)
+
+# The mT0 is the better one of two 
+#
+
+```
+
+```{r reasoning}
+curve(inv_logit(-0.78 + 0.39 * x + 0.72 * mean(d$S) + 0.06 * mean(post$Y) -0.23 * mean(d$dK)), add = TRUE, col = 3)
+
+
+# Notice the curve is not as steep as overall data look like. 
+# This should be due to the stratification. 
+points(post$SL[1, d$T == 2], d$K[d$T == 2], col = 3, lwd = 4)
+points(SL[d$T == 2], d$K[d$T == 2], col = 4, lwd = 4)
+
+```
