@@ -22,7 +22,7 @@ adjustmentSets(kdag, exposure="SL", outcome = "K")# This shows the backdoor path
 
 ## Synthetic Data
 - create a synthetic data with assumptions. See overview.pdf to check the data relationship. 
-```{r data, out.width="50%"}
+```{r data, fig.show="hold", out.width="50%"}
 
 # Function of SL by Y 
 myFunc <- function(x) {
@@ -174,7 +174,7 @@ m1<- ulam(
 
         sigma_SL ~ exponential(1), 
 
-         # Model T 
+         # Model T, This should be hard coded based on the previous research
         T ~ poisson((Y + 16)/ ( -2.4 + 16) * 25),
 
         # Model T by Y 
@@ -197,7 +197,9 @@ post <- extract.samples(m1)
 ```
 
 ## Hidden parameters 
-```{r hidden, out.width="50%"}
+- The hidden parameters are estimated by the model constraints and distributions. 
+- It is expected that the difference is small and has similar trend as the original data.
+```{r hidden, fig.show="hold", out.width="50%"}
 # Posterior Y changes 
 plot(1:200, Y)
 points(1:200, post$Y[1,], col = 2)
@@ -217,13 +219,20 @@ plot(Y, SL)
 points(post$Y[1,], post$SL[1,], col=2)
 for(i in 1 : 200) lines(c(Y[i], post$Y[1,i]), c(SL[i], post$SL[1,i]), col = 2)
 
+
+plot(Y, d$T)
+points(post$Y[1,], d$T ,col = 2)
+for (i in 1:200) lines(c(Y[i], post$Y[1,i]), c(d$T[i],d$T[i]), col = 2)
+
 ```
+
+
 => this shows that the difference is not very large and hidden parameters have similar trend as the original (synthetized) data. 
 
 ## Posterior Simulation 
 
-- Model K 
-```{r postpredK, out.width="50%"}
+### Model K 
+```{r postpredK, fig.show="hold", out.width="50%"}
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
 KbyS<- sapply(Sseq, 
@@ -268,11 +277,11 @@ lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 ```
 
-- Model S by dS and Y 
+### Model S by dS and Y 
+- By the way, there is no post-S exists as it seems absolutely same as post-SL
+- would be because it is one of the predictors that i provided data 
 
-```{r postpredS, out.width="50%"}
-# By the way, there is no post$S exists as it seems absolutely same as post$SL
-# would be because it is one of the predictors that i provided data 
+```{r postpredS, fig.show="hold", out.width="50%"}
 post$SL[1,] == post$S[1,] 
 
 plot(d$dS, d$S)
@@ -295,11 +304,12 @@ lines(Yseq, means, col = 2, lwd = 3)
 lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 ```
-The function catches the trend very well
 
-- Model SL by Y 
+- Functions catch the trend very well!
 
-```{r postpredSL, out.width="50%"}
+### Model SL by Y 
+
+```{r postpredSL, fig.show="hold", out.width="50%"}
 plot(Y, SL)
 points(post$Y[1,], post$SL[1,], col = 2)
 Yseq<-seq(-16, -2.4, len = 20)
@@ -314,11 +324,9 @@ lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 ```
 
 
-The model 1 looks good. All posterior prediction plots shows inclusion of data points inside the model scope. 
+- The model 1 looks good. All posterior prediction plots shows inclusion of data points inside the model scope. 
 
-There are three things to note. 
-    `. 
-but also I am wondering if I use correlation between S and SL instead of modeling Y in K model. 
+- but also I am wondering if I use correlation between S and SL instead of modeling Y in K model. 
 This is the m2
 
 
@@ -337,7 +345,7 @@ m2<- ulam(
         # So use partial pooling to regularize the estimate. 
         # mean should start at 0 and has small variation.
         
-        # In this case (m1.2), we do include correlation between S and SL due to Y. 
+        # In this case (m2), we do include correlation between S and SL due to Y. 
         vector[25]: aK <- aK_bar + sigma_aK * z_aK[T],
         vector [25]: bK_Y <- bK_Y_bar + sigma_bK_Y * z_bK_Y[T],
         c(aK_bar, bK_Y_bar)~normal(0,0.3),
@@ -417,14 +425,14 @@ post <- extract.samples(m2)
 
 ## Correlation?
 Rho value shows strong negative correlation between them. 
-```{r post2cor, out.width="50%"}
+```{r post2cor, fig.show="hold", out.width="50%"}
 R <- rlkjcorr( 1e4 , K=2 , eta=1 )# eta min lkj_corr()
 plot(density( R[,1,2]), ylim = c(0, 1))
 dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
 ```
 ## Posterior Predictions
 
-```{r post2pred, out.width="50%"}
+```{r post2pred, fig.show="hold", out.width="50%"}
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
 KbyS<- sapply(Sseq, 
@@ -457,7 +465,7 @@ lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 plot(Y, d$K)
 Yseq<-seq(-16, -2.4, len = 20)
-KbyY<- sapply(dKseq, 
+KbyY<- sapply(Yseq, 
     function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + post$bK_Y * i + rep(post$bK_dK,25) * d$K )) 
 PIs<- apply( KbyY , 2 , PI )
 means<- apply( KbyY , 2 , mean )
@@ -482,7 +490,7 @@ lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 K estimation by SL is a bit narrower than it supposed to be but other than that, everything looks great. 
 Let me compare those two models 
 
-```{r comp, out.width="50%"}
+```{r comp, fig.show="hold", out.width="50%"}
 # Compare models
 model_comparison <- compare(m1, m2)
 print(model_comparison)
@@ -514,8 +522,8 @@ m3<- ulam(
         c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.3),
         vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
         bK_T_bar ~ normal(0, 0.3), # regularization
-        sigma_bK_T ~ exponential(1), 
-        z_bK_T[T] ~ normal(0, 0.01),
+        sigma_bK_T ~ exponential(6), 
+        z_bK_T[T] ~ normal(0, 1),
 
         U ~ exponential(1),
 
@@ -528,9 +536,9 @@ m3<- ulam(
         # partial pooling for the same reason for a2 and b_Y_S
         c(aS, bS_Y, bS_dS) ~ normal(0,0.1), 
         vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
-        bS_T_bar ~ normal(0, 0.3), # regularization
-        sigma_bS_T ~ exponential(1), 
-        z_bS_T[T] ~ normal(0, 0.01),
+        bS_T_bar ~ normal(0, 0.001), # regularization
+        sigma_bS_T ~ exponential(10), 
+        z_bS_T[T] ~ normal(0, 0.1),
 
         sigma_S ~ exponential(1),
 
@@ -569,24 +577,14 @@ precis(m3, depth=1)
 post <- extract.samples(m3)
 ```
 - Again, I do not check the Hidden parameters since I have never touched it since m1
-```{r post3check}
+```{r post3check, fig.show="hold", out.width="50%"}
 
 # Model K
-
-plot(SL, d$K)
-SLseq<-seq(0, 1, len = 20)
-KbySL<- sapply(SLseq,  
-    function (i) inv_logit(rep(post$aK, 25) + rep(post$bK_S, 25) * d$S + rep(post$bK_SL, 25) * i + rep(post$bK_Y, 25) * post$Y + rep(post$bK_dK, 25) * d$dK + colMeans(post$bK_T)) )
-means<- apply( KbySL , 2 , mean )
-PIs<- apply( KbySL , 2 , PI )
-lines(SLseq, means, col = 2, lwd = 3)
-lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
 KbyS<- sapply(Sseq, 
-    function (i) inv_logit(rep(post$aK, 25) + rep(post$bK_S, 25) * i + rep(post$bK_SL, 25) * post$SL + rep(post$bK_Y, 25) * post$Y + rep(post$bK_dK, 25) * d$dK + colMeans(post$bK_T)) )
+    function (i) inv_logit(post$aK + post$bK_S * i + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
 means<- apply( KbyS , 2 , mean )
 PIs<- apply( KbyS , 2 , PI )
 lines(Sseq, means, col = 2, lwd = 3)
@@ -594,21 +592,31 @@ lines(Sseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 
+plot(SL, d$K)
+SLseq<-seq(0, 1, len = 20)
+KbySL<- sapply(SLseq,  # This is tricky but use bK_T for T value and others are not stratified so randomly assigned
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
+means<- apply( KbySL , 2 , mean )
+PIs<- apply( KbySL , 2 , PI )
+lines(SLseq, means, col = 2, lwd = 3)
+lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
+lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+
+
 plot(d$dK, d$K)
 dKseq<-seq(-2.5, 2, len = 20)
 KbydK<- sapply(dKseq, 
-    function (i) inv_logit(rep(post$aK, 25) + rep(post$bK_S, 25) * d$S + rep(post$bK_SL, 25) * post$SL + rep(post$bK_Y, 25) * post$Y + rep(post$bK_dK, 25) * i + colMeans(post$bK_T)) )
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * i + colMeans(post$bK_T)[d$T] ))
 PIs<- apply( KbydK , 2 , PI )
 means<- apply( KbydK , 2 , mean )
 lines(dKseq, means, col = 2, lwd = 3)
 lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-# This is problem
 plot(Y, d$K)
 Yseq<-seq(-16, -2.4, len = 20)
-KbyY<- sapply(dKseq, 
-    function (i) inv_logit(rep(post$aK, 25) + rep(post$bK_S, 25) * d$S + rep(post$bK_SL, 25) * post$SL + rep(post$bK_Y, 25) * i + rep(post$bK_dK, 25) * d$dK + colMeans(post$bK_T)) )
+KbyY<- sapply(Yseq, 
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
 PIs<- apply( KbyY , 2 , PI )
 means<- apply( KbyY , 2 , mean )
 lines(Yseq, means, col = 2, lwd = 3)
@@ -618,7 +626,7 @@ lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 plot(T, d$K)
 KbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y) + post$bK_dK * d$dK + post$bK_T[,i]) )
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y) + post$bK_dK * d$dK + colMeans(post$bK_T)[i] ))
 PIs<- apply( KbyT , 2 , PI )
 means<- apply( KbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
@@ -632,9 +640,9 @@ for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 plot(d$dS, d$S)
 dSseq<-seq(-2, 2, len = 20)
 SbydS<- sapply(dSseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * i + post$bS_Y * colMeans(post$Y) + mean(post$bS_T)))
-PIs<- apply( SbydS , 2 , PI )
+    function (i) inv_logit(post$aS + post$bS_dS * i + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[d$T]))
 means<- apply( SbydS , 2 , mean )
+PIs<- apply( SbydS , 2 , PI )
 lines(dSseq, means, col = 2, lwd = 3)
 lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
@@ -642,17 +650,16 @@ lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 plot(Y, d$S)
 Yseq<-seq(-16, -2.4, len = 20)
 SbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * i + mean(post$bS_T)))
+    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * i + colMeans(post$bS_T)[d$T]))
 means<- apply( SbyY , 2 , mean )
 PIs<- apply( SbyY , 2 , PI )
 lines(Yseq, means, col = 2, lwd = 3)
 lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-
 plot(T, d$S)
 SbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * colMeans(post$Y) + post$bS_T[,i]))
+    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[i]))
 PIs<- apply( SbyT , 2 , PI )
 means<- apply( SbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
@@ -661,17 +668,29 @@ points(1:25, PIs[2, ], col = 2, lty = 2)
 for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 
 ```
-Looks great, let me compare all those models 
 
 
-```{r comp2, out.width="50%"}
+Looks great, let me compare all those models.
+
+
+```{r comp2, fig.show="hold", out.width="50%"}
 # Compare models
-model_comparison <- compare(m1, m2)
+model_comparison <- compare(m1, m3)
+print(model_comparison)
+# Plot WAIC/PSIS differences
+plot(model_comparison)
+
+model_comparison <- compare(m2, m3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
 ```
 
+This looks Model 1 and 3 are almost same, but model 3 is a bit better. 
+
+# Future Suggestions 
+- Removing causal relationship in each model (for example, no causal relationship from Y to K) may be examined with actual data. 
+- The Model 3 still has a problem of bK_T and bS_T as they do not fit the data. I am trying to understand the reason and fix it. 
 ```{r forgetit}
 rm(list=ls())
 ```

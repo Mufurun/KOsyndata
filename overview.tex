@@ -172,24 +172,34 @@ However, in this case, T is modeled simple poisson distribution with 25 phases.
 
 \newpage
 
-\section{The priors and statistical model for Model 2 (m2)}
+\section{The priors and statistical model for Model 1 (m1)}
+- This model stratifies S, SL, and Y and includes hierarchical models of S and SL by Y
 \begin{itemize}
+\item Model K
 $$K \sim Normal(\mu_K, U) $$
 $$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{dK}} * dK$$
+
 \begin{itemize}
     \item We do not know anything about this but think similar for all group. 
     \item So use partial pooling to regularize the estimate. 
     \item mean should start at 0 and has small variation.
-    \item In this case (m1.2), we do include correlation between S and SL due to Y. 
+    \item In this case (m1), we do not include correlation. 
+    \item This is because multilevel models of S and SL includes the information of Y 
+    \item But we have to regularize.
 \end{itemize}
 $$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
-$$\overline{\alpha _K} \sim Normal(0,0.3)$$
-$$\sigma_{\alpha _K} \sim Exponential(1)$$
+$$\beta _{K_S } = \overline{\beta _{K _S}} + \sigma_{\beta _{K _S}} * z_{\beta _{K_S}}[T] $$
+$$\beta _{K_SL } = \overline{\beta _{K _{SL}}} + \sigma_{\beta _{K _{SL}}} * z_{\beta _{K_{SL}}}[T] $$
+$$\beta _{K_Y } = \overline{\beta _{K _Y}} + \sigma_{\beta _{K _Y}} * z_{\beta _{K_Y}}[T] $$
+
+$$\overline{\alpha _K}, \overline{\beta _{K _S}}, \overline{\beta _{K _{SL}}}, \overline{\beta _{K _Y}} \sim Normal(0,0.3)$$
+$$\sigma_{\alpha _K}, \sigma_{\beta _{K _S}}, \sigma_{\beta _{K _{Sl}}}, \sigma_{\beta _{K _Y}} \sim Exponential(1)$$
 $$z_{\alpha _K}[T] \sim Normal(0,0.1)$$
-\begin{itemize}
-    \item correlaton between $\beta _{K_S}$ and $\beta _{K_SL}$
-    \item this is not too strong but good correlation
-\end{itemize}
+$$z_{\beta _{K_S}}[T]  \sim Normal(0,0.1)$$
+$$z_{\beta _{K_{SL}}}[T]  \sim Normal(0,0.1)$$
+$$z_{\beta _{K_Y}}[T]  \sim Normal(0,0.1)$$
+
+
 $$\beta _{K_S}, \beta _{K_SL} \sim MultiNormal(\overline{\beta _b{K_S}}, \overline{\beta _b{K_SL}}, \rho _{S, SL}, \sigma _{S, SL})$$
 $$\overline {\beta _{K_S}}, \overline{\beta _{K_SL}} \sim Normal(0, 0.3)$$
 $$ \rho _{S, SL} \sim lkj_corr(1) $$
@@ -210,13 +220,11 @@ $$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS$$
     \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
 \end{itemize}
 $$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
-$$\overline{\alpha _S} \sim Normal(0,0.1)$$
-$$\sigma_{\alpha _S} \sim Exponential(6)$$
-$$z_{\alpha _S}[T] \sim Normal(0,0.05)$$
-
 $$\beta _{S_Y} = \overline{\beta _{S_Y}} + \sigma _{\beta _{S_Y}} * z _ {\beta _{S_Y}}[T]$$
-$$\overline{\beta _{S_Y}} \sim Normal(0,0.1) $$
-$$\sigma _{\beta _{S_Y}} ~ Exponential(6)$$
+
+$$\overline{\alpha _S}, \overline{\beta _{S_Y}} \sim Normal(0,0.1)$$
+$$\sigma_{\alpha _S}, \sigma _{\beta _{S_Y}} \sim Exponential(6)$$
+$$z_{\alpha _S}[T] \sim Normal(0,0.05)$$
 $$z _{\beta _{S_Y}}[T] ~ normal(0,0.05)$$
 
 \begin{itemize}
@@ -241,6 +249,9 @@ $$\sigma_{SL} \sim Exponential(1)$$
 
 \item Model T by Y  
 $$T \sim Poisson((Y + 16)/ ( -2.4 + 16) * 25)$$
+\begin{itemize}
+    \item This should be hard coded based on the previous research (Kanezaki, et al., 2025)
+\end{itemize}
 
 \item Model Y randomly
 $$Y \sim Uniform( -16 , -2.4 )$$
@@ -250,6 +261,8 @@ $$Y \sim Uniform( -16 , -2.4 )$$
 \newpage
 
 \section{The priors and statistical model for Model 2 (m2)}
+- This model stratifies S, SL, and Y and includes correlation between S and SL. 
+
 \begin{itemize}
  \item Main model K
 
@@ -259,7 +272,7 @@ $$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \
     \item We do not know anything about this but think similar for all group. 
     \item So use partial pooling to regularize the estimate. 
     \item mean should start at 0 and has small variation.
-    \item In this case (m1.2), we do include correlation between S and SL due to Y. 
+    \item In this case (m2), we do include correlation between S and SL due to Y. 
 \end{itemize}
 $$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
 $$\overline{\alpha _K} \sim Normal(0,0.3)$$
@@ -289,13 +302,11 @@ $$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS$$
     \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
 \end{itemize}
 $$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
-$$\overline{\alpha _S} \sim Normal(0,0.1)$$
-$$\sigma_{\alpha _S} \sim Exponential(6)$$
-$$z_{\alpha _S}[T] \sim Normal(0,0.05)$$
-
 $$\beta _{S_Y} = \overline{\beta _{S_Y}} + \sigma _{\beta _{S_Y}} * z _ {\beta _{S_Y}}[T]$$
-$$\overline{\beta _{S_Y}} \sim Normal(0,0.1) $$
-$$\sigma _{\beta _{S_Y}} ~ Exponential(6)$$
+
+$$\overline{\alpha _S}, \overline{\beta _{S_Y}} \sim Normal(0,0.1)$$
+$$\sigma_{\alpha _S}, \sigma _{\beta _{S_Y}} \sim Exponential(6)$$
+$$z_{\alpha _S}[T] \sim Normal(0,0.05)$$
 $$z _{\beta _{S_Y}}[T] ~ normal(0,0.05)$$
 
 \begin{itemize}
@@ -328,10 +339,74 @@ $$Y \sim Uniform( -16 , -2.4 )$$
 
 \newpage
 
-\section{The priors and statistical model for Model 2 (m2)}
+\section{The priors and statistical model for Model 1 (m1)}
+
 \begin{itemize}
+\item Model K
+$$K \sim Normal(\mu_K, U) $$
+$$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{dK}} * dK +  \beta _{K_T}[T]$$
+\begin{itemize}
+    \item We do not know anything about this but think similar for all group. 
+    \item So use partial pooling to regularize the estimate. 
+    \item mean should start at 0 and has small variation.
+\end{itemize}
+
+$$\alpha _K, \beta _{K_S }, \beta _{K_SL }, \beta _{K_Y }, \beta _{K_{dK}}  \sim Normal(0,0.3)$$
+
+
+$$\beta _{K_T} = \overline{\beta _{K_T}} + \sigma_{\beta _{K_T}} * z_{\beta_{K_T}}[T]$$
+\begin{itemize}
+    \item regularization
+\end{itemize}
+$$\overline{\beta {K_T}} \sim Normal(0, 0.3)$$
+$$\sigma_{\beta _{K_T}} \sim Exponential(6)$$
+$$z_{\beta _{K_T}}[T] \sim Normal(0, 1)$$
+
+$$U \sim Exponential(1)$$
+
+
+\item Model S 
+$$S \sim Normal(\mu_S, \sigma_S)$$
+$$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS + \beta_{S_T}$$
+\begin{itemize}
+    \item I am hoping/believing $\beta_{dS}$ is negative and $\beta_{Y_S}$ is positive 
+    \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
+\end{itemize}
+$$\alpha_S, \beta _{S_Y}, \beta {S_{dS}} \sim Normal(0,0.1)$$
+
+$$\beta _{S_T} = \overline{\beta _{S_T}} + \sigma_{\beta _[S_T]} * z_{\beta{S_T}}[T]$$
+$$\overline{\beta _{S_T}} \sim Normal(0, 0.001)$$
+$$\sigma_{\beta _[S_T]} \sim Exponential(10)$$ 
+$$z_{\beta{S_T}}[T] \sim Normal(0, 0.1)$$
+
+$$\sigma_S \sim Exponential(1)$$
+
+
+\item Model SL by Y 
+\begin{itemize}
+    \item The log function and prior was refered to the previous research of Sea Level Change over time. 
+    \item This function is abstruct so I will have to actually stan code to provide accurate estimates
+    \item ulam code in r does not allow us to hartd code the conditional function. 
+    \item vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
+\end{itemize}
+$$SL \sim Normal(\mu_{SL}, \sigma_{SL})$$
+$$logit(\mu_{SL}) = \alpha _{SL} + Y[i] * \beta_ {SL}$$
+$$\alpha _{SL} \sim Normal(8, 0.01)$$
+$$\beta _{SL} \sim Normal(0.8, 0.01)$$
+$$\sigma_{SL} \sim Exponential(1)$$
+
+\item Model T by Y  
+$$T \sim Poisson((Y + 16)/ ( -2.4 + 16) * 25)$$
+\begin{itemize}
+    \item This should be hard coded based on the previous research (Kanezaki, et al., 2025)
+\end{itemize}
+
+\item Model Y randomly
+$$Y \sim Uniform( -16 , -2.4 )$$
 
 \end{itemize}
+
+
 
 
 \end{document}
