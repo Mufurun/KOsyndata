@@ -1,3 +1,6 @@
+# Just for someone who does not like Rmd. 
+# I do not know if there is anyone like that.
+
 library("rethinking")
 library(dplyr)
 library(dagitty)
