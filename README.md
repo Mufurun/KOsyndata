@@ -5,7 +5,8 @@
 - The Bayesian causal analysis is based on the PDF ()
 
 ## Github Site Map 
-- [Overview.pdf] (https://github.com/Mufurun/KOsyndata/blob/main/overview.pdf): PDF file to outline the Bayesian analysis.
-- [m.html]()
+- [Overview.pdf](https://github.com/Mufurun/KOsyndata/blob/main/overview.pdf): PDF file to outline the Bayesian analysis.
+- [Overview.tex](https://github.com/Mufurun/KOsyndata/blob/main/overview.tex): Latex Source file for the pdf
+- [m.html](https://github.com/Mufurun/KOsyndata/blob/main/m.html)
 - [m.Rmd](https://github.com/Mufurun/KOsyndata/blob/main/m.Rmd): Rmd file that discribes the m1, m2, and m3.
 - [m.r](https://github.com/Mufurun/KOsyndata/blob/main/m.r): R source file that does the same thing as Rmd. ⌈
