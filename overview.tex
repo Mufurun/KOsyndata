@@ -6,9 +6,17 @@
 \usepackage{amsmath}
 \usepackage{hyperref} 
 \usepackage{float}
+\usepackage{titling}
 
+
+
+\title{Bayesian Analysis on Kozu Obsidian Synthetic Data}
+\date{\today} 
 
 \begin{document}
+\maketitle
+
+\section{Overview}
 
 In this PDF, I highlight the basic idea of Bayesian analysis based on the online lecture: Statistical Rethinking (\url{https://github.com/rmcelreath/stat_rethinking_2026}) by Richard McElreath. 
 The typical Bayesian analysis follows the core workflow shown in Fig. 1. 
@@ -78,7 +86,8 @@ Publication and publication year can bias the proportion of Kozu obsidians. Alth
 \newpage
 
 Now, hypothesis of the analysis is sea level and proportion of Shinshu obsidians affect the Kozu obsidians to check the degree of influence. 
-The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist in the data. 
+The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist in the data. U is the standard deviation of the model. 
+
 
 
 \begin{figure}[H]
@@ -112,12 +121,22 @@ The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist
 \caption{DAG of causalities among parameters - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
 \end{figure}
 
-
-
-U is the standard deviation of the model. There are ways to model SL: model SL by wither Y or T. 
+\section{3 Models Proposed here}
 As a background knowledge, we know the association of SL and Y based on previous research (). 
-\\
-\\
+Therefore, multi-level modeling is used. 
+\begin{itemize}
+    \item Model 1: stratifies data by T, and includes all the causation in Fig. 3: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
+    \item Model 2: stratifies data by T, and includes all the causation in Fig. 4: Model T by Y, Model SL by Y, Model S by dS, Model K by S, SL, Y, dK, and U with correlation between S and SL.
+    \begin{itemize}
+        \item Although Model 2 does not rely on Y to predict S, the causation is represented as correlation between S and SL. 
+    \end{itemize} 
+    \item Model 3: includes all the causation in Fig. 3 without any stratification: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
+    \begin{itemize}
+        \item See the m1.Rmd and m1.html
+    \end{itemize}
+\end{itemize}
+
+
 1. SL and T modeled by Y (Fig. 3, see m1.r): \\
 - As T is observed Y, Y can be the True value of T. Then I can make multilevel models, including Y predicts T. 
 As Y is estimated in ulam model of rethinking package, we can use it to estimate SL and K. 
@@ -126,6 +145,8 @@ As Y is estimated in ulam model of rethinking package, we can use it to estimate
 2. SL modeled by T (Fig.4, see m2.r): \\ 
 - based on the Bayesian analysis of Typological dates by Kanezaki, Omori, and Kobayashi in 2025 (\url{https://www.cambridge.org/core/journals/radiocarbon/article/optimal-bayesian-chronological-modeling-for-high-resolution-chronology-for-the-middle-jomon-of-kanto-region-honshu-island-japan-approaching-a-generational-scale/4B1717D6D82FFA1CF8A63E6B1EBCCC8D}), 
 we can estimate Y by T, which lead to SL. So, in this case, I put SL depending on T. 
+\\
+\\
 
 \begin{figure}[H]
 \centering 
@@ -161,7 +182,81 @@ we can estimate Y by T, which lead to SL. So, in this case, I put SL depending o
 \newpage
 
 The priors and statistical model for m1
+\begin{itemize}
+ \item Main model K
 
+$$K \sim Normal(\mu_K, U) $$
+$$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{dK}} * dK$$
+\begin{itemize}
+    \item We do not know anything about this but think similar for all group. 
+    \item So use partial pooling to regularize the estimate. 
+    \item mean should start at 0 and has small variation.
+    \item In this case (m1.2), we do include correlation between S and SL due to Y. 
+\end{itemize}
+$$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
+$$\overline{\alpha _K} \sim Normal(0,0.3)$$
+$$\sigma_{\alpha _K} \sim Exponential(1)$$
+$$z_{\alpha _K}[T] \sim Normal(0,0.1)$$
+\begin{itemize}
+    \item correlaton between $\beta _{K_S}$ and $\beta _{K_SL}$
+    \item this is not too strong but good correlation
+\end{itemize}
+$$\beta _{K_S}, \beta _{K_SL} \sim Multi_normal(\overline{\beta _b{K_S}}, \overline{\beta _b{K_SL}}, \rho _{S, SL}, \sigma _{S, SL})$$
+$$\overline {\beta _{K_S}}, \overline{\beta _{K_SL}} \sim Normal(0, 0.3)$$
+$$ \rho _{S, SL} \sim lkj_corr(1) $$
+$$\sigma _{S, SL} \sim Exponential(2) $$
+\begin{itemize}
+    \item Followings don't need regularization
+    \item We are hoping/believing $b_{dK}$ is negative, but this is not prior. 
+\end{itemize}
+$$\beta _{K_{dK}} \sim Normal(0, 0.5)$$
+$$U \sim Exponential(1)$$
+
+
+\item Model S 
+$$S \sim Normal(\mu_S, \sigma_S)$$
+$$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS$$
+\begin{itemize}
+    \item I am hoping/believing $\beta_{dS}$ is negative and $\beta_{Y_S}$ is positive 
+    \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
+\end{itemize}
+$$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
+$$\overline{\alpha _S} \sim Normal(0,0.1)$$
+$$\sigma_{\alpha _S} \sim Exponential(6)$$
+$$z_{\alpha _S}[T] \sim Normal(0,0.05)$$
+
+$$\beta _{S_Y} = \overline{\beta _{S_Y}} + \sigma _{\beta _{S_Y}} * z _ {\beta _{S_Y}}[T]$$
+$$\overline{\beta _{S_Y}} \sim Normal(0,0.1) $$
+$$\sigma _{\beta _{S_Y}} ~ Exponential(6)$$
+$$z _{\beta _{S_Y}}[T] ~ normal(0,0.05)$$
+
+\begin{itemize}
+    \item don't need regularization
+\end{itemize}
+$$\beta {S_{dS}} \sim Normal(0,0.1)$$
+$$\sigma_S \sim Exponential(1)$$
+
+
+\item Model SL by Y 
+\begin{itemize}
+    \item The log function and prior was refered to the previous research of Sea Level Change over time. 
+    \item This function is abstruct so I will have to actually stan code to provide accurate estimates
+    \item ulam code in r does not allow us to hartd code the conditional function. 
+    \item vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
+\end{itemize}
+$$SL \sim Normal(\mu_{SL}, \sigma_{SL})$$
+$$logit(\mu_{SL}) = \alpha _{SL} + Y[i] * \beta_ {SL}$$
+$$\alpha _{SL} \sim Normal(8, 0.01)$$
+$$\beta _{SL} \sim Normal(0.8, 0.01)$$
+$$\sigma_{SL} \sim Exponential(1)$$
+
+\item Model T by Y  
+$$T \sim Poisson((Y + 16)/ ( -2.4 + 16) * 25)$$
+
+\item Model Y randomly
+$$Y \sim Uniform( -16 , -2.4 )$$
+
+\end{itemize}
 
 
 

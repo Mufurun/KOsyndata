@@ -2009,6 +2009,8 @@ points(T, p1, col = 3)
 ```{r reasoning}
 curve(inv_logit(-0.78 + 0.39 * x + 0.72 * mean(d$S) + 0.06 * mean(post$Y) -0.23 * mean(d$dK)), add = TRUE, col = 3)
 
+#curve(inv_logit(-0.62+0.5*x+0.35*mean(SL)+0.07*mean(Y)-0.23*mean(d$dK)), add = TRUE)
+
 
 # Notice the curve is not as steep as overall data look like. 
 # This should be due to the stratification. 
