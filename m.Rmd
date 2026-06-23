@@ -202,7 +202,8 @@ dashboard(m1)
 
 - This has so much divergent and less effective sampling. 
 - This would be due to the large number of parameters, including hidden estimated ones (SL and Y). I will reduce parameters to reliably interpret the result. 
-    - First one would be Y as SL is more important for the model. 
+    - First one would be Y as S and SL are more important for the model. 
+        - by the way, SL and Y in model K change the efficiency in the highest rate. 
 
 
 ```{r m1.2}
@@ -722,11 +723,11 @@ m3<- ulam(
         # So use partial pooling to regularize the estimate. 
         # mean should start at 0 and has small variation.
         
-        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.3),
+        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.1), # This is different from the other one, so that bK_T works well; otherwise, it does not somehow.
         vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
-        bK_T_bar ~ normal(0, 0.3), # regularization
-        sigma_bK_T ~ exponential(6), 
-        z_bK_T[T] ~ normal(0, 1),
+        bK_T_bar ~ normal(0, 0.1), # regularization but not high sigma
+        sigma_bK_T ~ exponential(1), 
+        z_bK_T[T] ~ normal(0, 0.1),
 
         U ~ exponential(1),
 
@@ -739,8 +740,8 @@ m3<- ulam(
         # partial pooling for the same reason for a2 and b_Y_S
         c(aS, bS_Y, bS_dS) ~ normal(0,0.1), 
         vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
-        bS_T_bar ~ normal(0, 0.001), # regularization
-        sigma_bS_T ~ exponential(10), 
+        bS_T_bar ~ normal(0, 0.1), # regularization
+        sigma_bS_T ~ exponential(1), 
         z_bS_T[T] ~ normal(0, 0.1),
 
         sigma_S ~ exponential(1),
@@ -764,7 +765,7 @@ m3<- ulam(
     adapt_delta = 0.99
   )
 )
-dashboard(m3)
+precis(m3, depth = 1)
 
 ```
 
@@ -777,11 +778,11 @@ m3.2<- ulam(
         K ~ normal(mu_K, U), 
         logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_dK * dK + bK_T[T],
 
-        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.3),
+        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.1),
         vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
-        bK_T_bar ~ normal(0, 0.3),
-        sigma_bK_T ~ exponential(6), 
-        z_bK_T[T] ~ normal(0, 1),
+        bK_T_bar ~ normal(0, 0.1), 
+        sigma_bK_T ~ exponential(1), 
+        z_bK_T[T] ~ normal(0, 0.1),
 
         U ~ exponential(1),
 
@@ -791,7 +792,55 @@ m3.2<- ulam(
 
         c(aS, bS_Y, bS_dS) ~ normal(0,0.1), 
         vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
-        bS_T_bar ~ normal(0, 0.001), 
+        bS_T_bar ~ normal(0, 0.1), 
+        sigma_bS_T ~ exponential(1), 
+        z_bS_T[T] ~ normal(0, 0.1),
+
+        sigma_S ~ exponential(1),
+
+        # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+        # Model T, This should be hard coded based on the previous research
+        T ~ poisson(Y * 25),
+
+        # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+    ), dat = d, constraints = list(
+        SL   = "lower=0,upper=1", # SL is between 0 and 1 
+        Y    = "lower=0,upper=1" # Y is between 0 and 1 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
+)
+
+precis(m3.2, depth = 1)
+```
+
+- This is still not the best model with low efficiency. I will remove one more parameter. 
+- I can remove bK_T or bS_T but this time, I want to make this similar to m1.3 and m2.3. 
+```{r m3.3}
+m3.3<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_dK * dK + bK_T[T],
+
+        c(aK, bK_S,  bK_SL, bK_dK) ~ normal(0,0.1),
+        vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
+        bK_T_bar ~ normal(0, 0.1), 
+        sigma_bK_T ~ exponential(1), 
+        z_bK_T[T] ~ normal(0, 0.1),
+
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS + bS_dS * dS + bS_T[T],
+
+        c(aS, bS_dS) ~ normal(0,0.3), 
+        vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
+        bS_T_bar ~ normal(0, 0.1), 
         sigma_bS_T ~ exponential(10), 
         z_bS_T[T] ~ normal(0, 0.1),
 
@@ -813,73 +862,22 @@ m3.2<- ulam(
   )
 )
 
-dashboard(m3.2)
-precis(m3.2, depth = 1)
-```
-
-- This is still not the best model with low efficiency. I will remove one more parameter. 
-```{r m3.3}
-m3.3<- ulam(
-    alist (
-    # Main model K
-        K ~ normal(mu_K, U), 
-        logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_dK * dK + bK_T[T],
-
-        c(aK, bK_S,  bK_SL, bK_dK) ~ normal(0,0.3),
-        vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
-        bK_T_bar ~ normal(0, 0.3), # regularization
-        sigma_bK_T ~ exponential(6), 
-        z_bK_T[T] ~ normal(0, 1),
-
-        U ~ exponential(1),
-
-    # Model S 
-        S ~ normal(mu_S, sigma_S),
-        logit(mu_S) <- aS + bS_dS * dS + bS_T[T],
-
-        c(aS, bS_dS) ~ normal(0,0.1), 
-        vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
-        bS_T_bar ~ normal(0, 0.001), # regularization
-        sigma_bS_T ~ exponential(10), 
-        z_bS_T[T] ~ normal(0, 0.1),
-
-        sigma_S ~ exponential(1),
-
-        # Model SL by Y
-        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
-
-        # Model T, This should be hard coded based on the previous research
-        T ~ poisson(Y * 25),
-
-        # Model T by Y 
-        vector[200]:Y ~ normal( 0.5, 0.2)
-    ), dat = d, constraints = list(
-        SL   = "lower=0,upper=1", # SL is between 0 and 1 
-        Y    = "lower=0,upper=1" # Y is between 0 and 1 
-    ), chains=4, cores=4,  log_lik=TRUE, max_treedepth = 13, control = list(
-    adapt_delta = 0.99
-  )
-)
-iter= 4000, warmup = 2000,
 dashboard(m3.3)
 precis(m3.3, depth = 1)
 
-### Give me some reasoning to remove the parameter
 ```
 
 # Posterior Check
 ```{r post3}
-post <- extract.samples(m3)
+post <- extract.samples(m3.2)
 ```
 - Again, I do not check the Hidden parameters since I have never touched it since m1
 ```{r post3check, fig.show="hold", out.width="50%"}
 
-# Model K
-
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
 KbyS<- sapply(Sseq, 
-    function (i) inv_logit(post$aK + post$bK_S * i + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
+    function (i) inv_logit(post$aK + post$bK_S * i + post$bK_SL * colMeans(post$SL) + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ) )
 means<- apply( KbyS , 2 , mean )
 PIs<- apply( KbyS , 2 , PI )
 lines(Sseq, means, col = 2, lwd = 3)
@@ -888,9 +886,10 @@ lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 
 plot(SL, d$K)
+points(post$SL[1,], d$K, col = 2) # include the estimated points, though we confirmed above that it is close to the orignial
 SLseq<-seq(0, 1, len = 20)
-KbySL<- sapply(SLseq,  # This is tricky but use bK_T for T value and others are not stratified so randomly assigned
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] )) 
 means<- apply( KbySL , 2 , mean )
 PIs<- apply( KbySL , 2 , PI )
 lines(SLseq, means, col = 2, lwd = 3)
@@ -901,27 +900,16 @@ lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 plot(d$dK, d$K)
 dKseq<-seq(-2.5, 2, len = 20)
 KbydK<- sapply(dKseq, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * i + colMeans(post$bK_T)[d$T] ))
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_dK * i + colMeans(post$bK_T)[d$T] )) 
 PIs<- apply( KbydK , 2 , PI )
 means<- apply( KbydK , 2 , mean )
 lines(dKseq, means, col = 2, lwd = 3)
 lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-plot(Y, d$K)
-Yseq<-seq(0, 1, len = 20)
-KbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
-PIs<- apply( KbyY , 2 , PI )
-means<- apply( KbyY , 2 , mean )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
-
 plot(T, d$K)
 KbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y) + post$bK_dK * d$dK + colMeans(post$bK_T)[i] ))
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_dK * d$dK + colMeans(post$bK_T)[i]))
 PIs<- apply( KbyT , 2 , PI )
 means<- apply( KbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
@@ -929,32 +917,20 @@ points(1:25, PIs[1, ], col = 2, lty = 2 )
 points(1:25, PIs[2, ], col = 2, lty = 2 )
 for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 
-
 # Model S
-
 plot(d$dS, d$S)
 dSseq<-seq(-2, 2, len = 20)
 SbydS<- sapply(dSseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * i + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[d$T]))
-means<- apply( SbydS , 2 , mean )
+    function (i) inv_logit(post$aS + post$bS_dS * i + colMeans(post$bS_T)[d$T] )) # Used mean of each simulated data
 PIs<- apply( SbydS , 2 , PI )
+means<- apply( SbydS , 2 , mean )
 lines(dSseq, means, col = 2, lwd = 3)
 lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-plot(Y, d$S)
-Yseq<-seq(0, 1, len = 20)
-SbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * i + colMeans(post$bS_T)[d$T]))
-means<- apply( SbyY , 2 , mean )
-PIs<- apply( SbyY , 2 , PI )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
 plot(T, d$S)
 SbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[i]))
+    function (i) inv_logit(post$aS + post$bS_dS * d$dS + colMeans(post$bS_T)[i]))
 PIs<- apply( SbyT , 2 , PI )
 means<- apply( SbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
@@ -971,18 +947,18 @@ Other than that, looks great, let me compare all those models.
 
 ```{r comp2, fig.show="hold", out.width="50%"}
 # Compare models
-model_comparison <- compare(m1, m3)
+model_comparison <- compare(m1.3, m3.3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
 
-model_comparison <- compare(m2, m3)
+model_comparison <- compare(m2.3, m3.3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
 ```
 
-This looks Model 1 and 3 are almost same, but model 3 is a bit better. 
+This looks Model 1 is a bit better in this case. 
 
 # Future Suggestions 
 - Removing causal relationship in each model (for example, no causal relationship from Y to K) may be examined with actual data. 
