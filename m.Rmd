@@ -1,5 +1,6 @@
 ---
 title: "Models Rmd"
+date: "`r Sys.Date()`"
 output:
   html_document: default
   pdf_document: default
@@ -261,7 +262,7 @@ dashboard(m1.2)
 ```
 
 
-This is still bad model as the eff is very small number 
+This is still bad model as the sampling efficiency is very small number 
 
 ```{r m1.3, error = FALSE, warning = FALSE, message = FALSE}
 # Model 1.3 
@@ -309,7 +310,7 @@ dashboard(m1.3)
 precis(m1.3, depth=1)
 ```
 
-- This is very high eff and no divergent. This is great. This model is reliably sampled to be used for analysis!
+- This is very high eff and no divergent, as I can see in my synthetic data (I do not know yours,,,). This is great. This model is reliably sampled to be used for analysis!
 
 ### Posterior Check
 ```{r post}
