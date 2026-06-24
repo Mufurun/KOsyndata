@@ -1,15 +1,17 @@
+# Models
 
 library("rethinking")
 library(dplyr)
 library(dagitty)
+
 ## Causal effects of the DAG 
-```{r DAG}
 kdag<-dagitty("dag {
   S-> K <- T 
   T -> S
   T -> SL -> K
 }")
 adjustmentSets(kdag, exposure="SL", outcome = "K")# This shows the backdoor path and how to stratify
+
 
 ## Synthetic Data
 
@@ -96,13 +98,12 @@ plot(d$dS, d$S)
 plot(Y, d$S)
 plot(d$dS, d$K) # no correlation
 
-
-
 ## Prior Prediction 
+
 plot(Y, SL)
 # Simulation 
-for(i in 1:10)curve(inv_logit(rnorm(1, 10, 0.2)*x + rnorm(1, -4, 0.2)), add =TRUE, col = 2)
-curve(inv_logit(10*x - 4), add =TRUE, lwd = 3)
+for(i in 1:10)curve(inv_logit(rnorm(1, 6, 0.2)*x + rnorm(1, -2, 0.2)) - rnorm(1, 0.04, 0.02), add =TRUE, col = 2)
+curve(inv_logit(6*x - 2) - 0.04, add =TRUE, lwd = 3)
 legend(0.5, 0.2,legend="Black line is my estimation, \nred is simulation")
 
 
@@ -116,7 +117,7 @@ m1<- ulam(
         # We do not know anything about this but think similar for all group. 
         # So use partial pooling to regularize the estimate. 
         # mean should start at 0 and has small variation.
-        
+    
         # In this case (m1), we do not include correlation. 
         # This is because multilevel models of S and SL includes the information of Y 
         # But we have to regularize. 
@@ -133,68 +134,150 @@ m1<- ulam(
 
         # don't need regularization as dK is not affected by T
         # We are hoping/believing b_dK is negative, but this is not prior. 
-        bK_dK ~ normal(0, 0.5),
-        U ~ exponential(1),
+        bK_dK ~ normal(0, 0.3),
+         U ~ exponential(1),
 
+     # Model S 
+         S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS[T] + bS_Y[T] * Y[i] + bS_dS * dS,
+
+         # I am hoping/believing b_dS is negative and b_Y_S is positive 
+         # partial pooling for the same reason for a2 and b_Y_S
+         vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
+         vector[25]: bS_Y<-bS_Y_bar + sigmabS_Y * zbS_Y[T],
+         c(aS_bar, bS_Y_bar) ~ normal(0,0.3), 
+         c(sigma_aS, sigmabS_Y) ~ exponential(6),
+         z_aS[T] ~ normal(0,0.1),
+         zbS_Y[T] ~ normal(0,0.1),
+
+        # don't need regularization
+         bS_dS ~ normal(0,0.3),
+         sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        # The log function and prior was refered to the previous research of Sea Level Change over time. 
+        # This function is abstruct so I will have to actually stan code to provide accurate estimates
+        # ulam code in r does not allow us to hartd code the conditional function. 
+        # vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+    # Model T, This should be hard coded based on the previous research
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal(0.5, 0.3)
+
+    ), dat = d, constraints = list(
+        SL    = "lower=0,upper=1", # SL is between 0 and 1 
+        Y    = "lower=0,upper=1" # Y is between 0 and 1 
+        #, T    = "lower=1,upper=25"  #this is unnecessary since T is provided in the dat 
+
+    
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE
+)
+dashboard(m1)
+# Model 1.2 
+m1.2<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK[T] + bK_S[T] * S + bK_SL[T] * SL[i] + bK_dK * dK,
+        vector[25]: aK <- aK_bar + sigma_aK * z_aK[T],
+        vector [25]: bK_S <- bK_S_bar + sigma_bK_S * z_bK_S[T],
+        vector [25]: bK_SL <- bK_SL_bar + sigma_bK_SL * z_bK_SL[T],
+        c(aK_bar, bK_S_bar,  bK_SL_bar) ~ normal(0,0.3),
+        c(sigma_aK, sigma_bK_S, sigma_bK_SL) ~ exponential(6), 
+        z_aK[T] ~ normal(0,0.1),
+        z_bK_S[T] ~ normal(0,0.1),
+        z_bK_SL[T] ~ normal(0,0.1),
+        bK_dK ~ normal(0, 0.3),
+        U ~ exponential(1),
 
     # Model S 
         S ~ normal(mu_S, sigma_S),
-        logit(mu_S) <- aS[T] + bS_dS * dS + bS_Y[T] * Y[i],
-
-        # I am hoping/believing b_dS is negative and b_Y_S is positive 
-        # partial pooling for the same reason for a2 and b_Y_S
+        logit(mu_S) <- aS[T] + bS_Y[T] * Y[i] + bS_dS * dS ,
         vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
         vector[25]: bS_Y<-bS_Y_bar + sigmabS_Y * zbS_Y[T],
-        c(aS_bar, bS_Y_bar) ~ normal(0,0.1), 
+        c(aS_bar, bS_Y_bar) ~ normal(0,0.3), 
         c(sigma_aS, sigmabS_Y) ~ exponential(6),
-        z_aS[T] ~ normal(0,0.05),
-        zbS_Y[T] ~ normal(0,0.05),
-
-        # don't need regularization
-        bS_dS ~ normal(0,0.1),
+        z_aS[T] ~ normal(0,0.1),
+        zbS_Y[T] ~ normal(0,0.1),
+        bS_dS ~ normal(0,0.3),
         sigma_S ~ exponential(1),
 
-
         # Model SL by Y
-            # The log function and prior was refered to the previous research of Sea Level Change over time. 
-            # This function is abstruct so I will have to actually stan code to provide accurate estimates
-            # ulam code in r does not allow us to hartd code the conditional function. 
-            # vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
-        vector[200]: SL ~ normal(mu_SL, sigma_SL),
-        vector[200]: logit(mu_SL) <- aSL + Y[i] * bSL,
-            # Should be very low variation since this part is hard coded.
-            # This time the estimation is not great so this is fine
-        aSL ~ normal(-4, 0.2),  
-        bSL ~ normal(10, 0.2),  
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
 
-        sigma_SL ~ exponential(1), 
-
-         # Model T, This should be hard coded based on the previous research
+        # Model T, This should be hard coded based on the previous research
         T ~ poisson(Y * 25),
 
         # Model T by Y 
-        vector[200]:Y ~ uniform( 0, 1 ) # This this is something to do with the +/- change
+        vector[200]:Y ~ normal( 0.5, 0.2)
 
     ), dat = d, constraints = list(
-        SL    = "lower=0,upper=1" # SL is between 0 and 1 
-        #, T    = "lower=1,upper=25"  #this is unnecessary since T is provided in the dat 
-    # 4000 iteration and 2000 warmup to efficiently sample
-    ), iter = 4000, warmup = 2000, chains=4, cores=4, log_lik=TRUE
+        SL    = "lower=0,upper=1" 
+        , Y    = "lower=0,upper=1"  
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE
 )
- 
-
-dashboard(m1)
-precis(m1, depth=1)
+dashboard(m1.2)
 
 
+# Model 1.3 
+m1.3<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK[T] + bK_S[T] * S + bK_SL[T] * SL[i]  + bK_dK * dK,
+
+        vector[25]: aK <- aK_bar + sigma_aK * z_aK[T],
+        vector [25]: bK_S <- bK_S_bar + sigma_bK_S * z_bK_S[T],
+        vector [25]: bK_SL <- bK_SL_bar + sigma_bK_SL * z_bK_SL[T],
+        c(aK_bar, bK_S_bar,  bK_SL_bar) ~ normal(0,0.3),
+        c(sigma_aK, sigma_bK_S, sigma_bK_SL) ~ exponential(6), 
+        z_aK[T] ~ normal(0,0.1),
+        z_bK_S[T] ~ normal(0,0.1),
+        z_bK_SL[T] ~ normal(0,0.1),
+        bK_dK ~ normal(0, 0.3),
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS[T] + bS_dS * dS,
+        vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
+        aS_bar ~ normal(0,0.3), 
+        sigma_aS ~ exponential(6),
+        z_aS[T] ~ normal(0,0.1),
+        bS_dS ~ normal(0,0.3),
+        sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+    # Model T, This should be hard coded based on the previous research
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+
+    ), dat = d, constraints = list(
+        SL    = "lower=0,upper=1", 
+        Y    = "lower=0,upper=1" 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE
+)
+dashboard(m1.3)
+precis(m1.3, depth=1)
 # Posterior Check
-post <- extract.samples(m1)
-
+post <- extract.samples(m1.3)
 ## Hidden parameters 
+# Posterior Y changes 
 plot(1:200, Y)
 points(1:200, post$Y[1,], col = 2)
 for(i in 1 : 200) lines(c(i, i), c(post$Y[1,i], Y[i]), col = 2)
 
+plot(1:200, SL)
+points(1:200, post$SL[1,], col = 2)
+for(i in 1 : 200) lines(c(i, i), c(post$SL[1,i], SL[i]), col = 2)
+
+# check Y and SL with K 
 plot(Y, d$K)
 points(post$Y[1,], d$K, col = 2)
 for(i in 1 : 200) lines(c(post$Y[1,i], Y[i]), c(d$K[i], d$K[i]), col = 2)
@@ -205,21 +288,23 @@ for(i in 1 : 200) lines(c(post$SL[1,i], SL[i]), c(d$K[i], d$K[i]), col = 2)
 points(post$SL[2,], d$K, col = 3)
 for(i in 1 : 200) lines(c(post$SL[2,i], SL[i]), c(d$K[i], d$K[i]), col = 3)
 
-plot(Y, SL)
-points(post$Y[1,], post$SL[1,], col=2)
-for(i in 1 : 200) lines(c(Y[i], post$Y[1,i]), c(SL[i], post$SL[1,i]), col = 2)
-
+# Y and T 
 plot(Y, d$T)
 points(post$Y[1,], d$T ,col = 2)
 for (i in 1:200) lines(c(Y[i], post$Y[1,i]), c(d$T[i],d$T[i]), col = 2)
 
+# Y and SL both hidden parameters
+plot(Y, SL)
+points(post$Y[1,], post$SL[1,], col=2)
+for(i in 1 : 200) lines(c(Y[i], post$Y[1,i]), c(SL[i], post$SL[1,i]), col = 2)
 
 ## Posterior Simulation 
+
 ### Model K 
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
-KbyS<- sapply(Sseq, 
-    function (i) inv_logit(post$aK + post$bK_S * i + t(t(post$bK_SL) * colMeans(post$SL)) + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * d$dK )) 
+KbyS<- sapply(Sseq, # Tricky but t and t to calculate estimates by group, though dK does not have group so do not need 
+    function (i) inv_logit(post$aK + post$bK_S * i + t(t(post$bK_SL) * colMeans(post$SL)) + rep(post$bK_dK, 25) * d$dK )) 
 means<- apply( KbyS , 2 , mean )
 PIs<- apply( KbyS , 2 , PI )
 lines(Sseq, means, col = 2, lwd = 3)
@@ -229,8 +314,8 @@ lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 plot(SL, d$K)
 SLseq<-seq(0, 1, len = 20)
-KbySL<- sapply(SLseq, # Tricky but t and t to calculate estimates by group, though dK does not have group so do not need 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + post$bK_SL * i + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * d$dK )) 
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + post$bK_SL * i + rep(post$bK_dK, 25) * d$dK )) 
 means<- apply( KbySL , 2 , mean )
 PIs<- apply( KbySL , 2 , PI )
 lines(SLseq, means, col = 2, lwd = 3)
@@ -241,65 +326,33 @@ lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 plot(d$dK, d$K)
 dKseq<-seq(-2.5, 2, len = 20)
 KbydK<- sapply(dKseq, 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * i )) 
+    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + rep(post$bK_dK, 25) * i )) 
 PIs<- apply( KbydK , 2 , PI )
 means<- apply( KbydK , 2 , mean )
 lines(dKseq, means, col = 2, lwd = 3)
 lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-dim(t(t(post$bK_S) * d$S))
-for(i in 1800:1900)points(post$Y[i,], d$K, col =2)
-points(post$Y[i, T==5], d$K[T==5], col = 4, lwd = 3)
+```
 
-plot(Y, d$K)
-Yseq<-seq(0, 1, len = 20)
-KbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + post$bK_Y * i + rep(post$bK_dK,25) * d$K )) 
-PIs<- apply( KbyY , 2 , PI )
-means<- apply( KbyY , 2 , mean )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
+### Model S by dS
+- By the way, there is no post-S exists as it seems absolutely same as post-SL
+- would be because it is one of the predictors that i provided data 
 
-
-### Model S by dS and Y 
+```{r postpredS, fig.show="hold", out.width="50%"}
 post$SL[1,] == post$S[1,] 
 
 plot(d$dS, d$S)
 dSseq<-seq(-2, 2, len = 20)
 SbydS<- sapply(dSseq, 
-    function (i) inv_logit(post$aS + rep(post$bS_dS, 25) * i + post$bS_Y * colMeans(post$Y))) # Used mean of each simulated data
+    function (i) inv_logit(post$aS + rep(post$bS_dS, 25) * i )) # Used mean of each simulated data
 PIs<- apply( SbydS , 2 , PI )
 means<- apply( SbydS , 2 , mean )
 lines(dSseq, means, col = 2, lwd = 3)
 lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-plot(Y, d$S)
-Yseq<-seq(0, 1, len = 20)
-SbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aS + rep(post$bS_dS, 25) * d$dS + post$bS_Y * i))
-means<- apply( SbyY , 2 , mean )
-PIs<- apply( SbyY , 2 , PI )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
-### Model SL by Y 
-
-plot(Y, SL)
-points(post$Y[1,], post$SL[1,], col = 2)
-Yseq<-seq(0, 1, len = 20)
-SLbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aSL + post$bSL * i))
-PIs<- apply( SLbyY , 2 , PI )
-means<- apply( SLbyY , 2 , mean )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
-
+plot(SL, S)
 
 # Model 2 (m2)
 m2<- ulam(
@@ -308,8 +361,8 @@ m2<- ulam(
         K ~ normal(mu_K, U), 
         logit(mu_K) <- aK[T] + bK_S[T] * S + bK_SL[T] * SL[i] + bK_Y[T] * Y[i] + bK_dK * dK,
 
-        # We do not know anything about this but think similar for all group. 
-        # So use partial pooling to regularize the estimate. 
+        # We do not know anything about each parameter but think similar for all group. 
+        # So use partial pooling to regularize estimates. 
         # mean should start at 0 and has small variation.
         
         # In this case (m2), we do include correlation between S and SL due to Y. 
@@ -317,121 +370,203 @@ m2<- ulam(
         vector [25]: bK_Y <- bK_Y_bar + sigma_bK_Y * z_bK_Y[T],
         c(aK_bar, bK_Y_bar)~normal(0,0.3),
         c(sigma_aK, sigma_bK_Y) ~ exponential(6),
-        z_aK[T]~normal(0,0.01),
-        z_bK_Y[T] ~ normal(0,0.01),
+        z_aK[T]~normal(0,0.1),
+        z_bK_Y[T] ~ normal(0,0.1),
 
         transpars>vector[25]:bK_S <<- v[,1],
         transpars>vector[25]:bK_SL <<- v[,2],
 
-        matrix[25, 2]:v ~ multi_normal(c(bK_S_bar, bK_SL_bar), RhoSSL, sigmaSSL),
-        c(bK_S_bar, bK_SL_bar) ~ normal(0, 0.3),
-        corr_matrix[2]:RhoSSL ~ lkj_corr(1),# this is not too strong but good correlation
-        vector[2]: sigmaSSL ~ exponential(2), 
-
+        transpars>matrix[25, 2]:v <- compose_noncentered(sigmaSSL, RhoSSL, zSSL), 
+        vector[2]: sigmaSSL ~ exponential(2),
+        cholesky_factor_corr[2]:RhoSSL ~ lkj_corr_cholesky(1), # I do not expect very very strong correlation.
+        matrix[2,25]: zSSL ~ normal(0 , 1), 
 
         # don't need regularization
         # We are hoping/believing b_dK is negative, but this is not prior. 
-        bK_dK ~ normal(0, 0.5),
+        bK_dK ~ normal(0, 0.3),
         U ~ exponential(1),
 
 
     # Model S 
         S ~ normal(mu_S, sigma_S),
-        logit(mu_S) <- aS[T] + bS_dS * dS,
+        logit(mu_S) <- aS[T] + bS_Y[T] * Y[i] + bS_dS * dS ,
 
         # I am hoping/believing b_dS is negative and b_Y_S is positive 
         # partial pooling for the same reason for a2 and b_Y_S
         vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
         vector[25]: bS_Y<-bS_Y_bar + sigmabS_Y * zbS_Y[T],
-
         c(aS_bar, bS_Y_bar) ~ normal(0,0.3), 
         c(sigma_aS, sigmabS_Y) ~ exponential(6),
-        z_aS[T] ~ normal(0,0.01),
-        zbS_Y[T] ~ normal(0,0.01),
+        z_aS[T] ~ normal(0,0.1),
+        zbS_Y[T] ~ normal(0,0.1),
 
         # don't need regularization
+        bS_dS ~ normal(0,0.3),
+        sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+    # Model T, This should be hard coded based on the previous research
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+    ), dat = d, constraints = list(
+        SL    = "lower=0,upper=1", # SL is between 0 and 1 
+        Y    = "lower=0,upper=1" # Y is between 0 and 1 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
+)
+
+dashboard(m2)
+
+# Model 2,2
+m2.2<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK[T] + bK_S[T] * S + bK_SL[T] * SL[i] + bK_dK * dK,
+        vector[25]: aK <- aK_bar + sigma_aK * z_aK[T],
+        aK_bar~normal(0,0.3),
+        sigma_aK ~ exponential(6),
+        z_aK[T]~normal(0,0.1),
+
+        transpars>vector[25]:bK_S <<- v[,1],
+        transpars>vector[25]:bK_SL <<- v[,2],
+
+        transpars>matrix[25, 2]:v <- compose_noncentered(sigmaSSL, RhoSSL, zSSL), 
+        vector[2]: sigmaSSL ~ exponential(2),
+        cholesky_factor_corr[2]:RhoSSL ~ lkj_corr_cholesky(1),
+        matrix[2,25]: zSSL ~ normal(0 , 1), 
+        bK_dK ~ normal(0, 0.3),
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS[T] + bS_Y[T] * Y[i] + bS_dS * dS ,
+        vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
+        vector[25]: bS_Y<-bS_Y_bar + sigmabS_Y * zbS_Y[T],
+        c(aS_bar, bS_Y_bar) ~ normal(0,0.3), 
+        c(sigma_aS, sigmabS_Y) ~ exponential(6),
+        z_aS[T] ~ normal(0,0.1),
+        zbS_Y[T] ~ normal(0,0.1),
+        bS_dS ~ normal(0,0.3),
+        sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+    # Model T
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+    ), dat = d, constraints = list(
+        SL    = "lower=0,upper=1", 
+        Y    = "lower=0,upper=1" 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
+)
+dashboard(m2.2)
+
+# Model 2.3
+m2.3<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK[T] + bK_S[T] * S + bK_SL[T] * SL[i] + bK_dK * dK,
+        vector[25]: aK <- aK_bar + sigma_aK * z_aK[T],
+        aK_bar~normal(0,0.3),
+        sigma_aK ~ exponential(6),
+        z_aK[T]~normal(0,0.1),
+        transpars>vector[25]:bK_S <<- v[,1],
+        transpars>vector[25]:bK_SL <<- v[,2],
+        transpars>matrix[25, 2]:v <- compose_noncentered(sigmaSSL, RhoSSL, zSSL), 
+        vector[2]: sigmaSSL ~ exponential(2),
+        cholesky_factor_corr[2]:RhoSSL ~ lkj_corr_cholesky(1),
+        matrix[2,25]: zSSL ~ normal(0 , 1), 
+        bK_dK ~ normal(0, 0.3),
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS[T] + bS_dS * dS ,
+        vector[25]: aS<-aS_bar + sigma_aS * z_aS[T],
+        aS_bar ~ normal(0,0.3), 
+        sigma_aS ~ exponential(6),
+        z_aS[T] ~ normal(0,0.1),
         bS_dS ~ normal(0,0.1),
         sigma_S ~ exponential(1),
 
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
 
-        # Model SL by Y 
-        # The log function and prior was refered to the previous research of Sea Level Change over time. 
-        # This function is abstruct so I will have to actually stan code to provide accurate estimates
-        # ulam code in r does not allow us to hartd code the conditional function. 
-        # vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
-        vector[200]: SL ~ normal(mu_SL, sigma_SL),
-        vector[200]: logit(mu_SL) <- aSL + Y[i] * bSL,
-        # Should be very low variation since this part is hard coded.
-        # This time the estimation is not great so this is fine
-        aSL ~ normal(-4, 0.2),  
-        bSL ~ normal(10, 0.2),  
-
-        sigma_SL ~ exponential(1), 
-
-         # Model T 
+    # Model T
         T ~ poisson(Y * 25),
 
-        # Model T by Y 
-        vector[200]:Y ~ uniform( 0 , 1 )
-
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
     ), dat = d, constraints = list(
-        SL    = "lower=0,upper=1" # SL is between 0 and 1 
-    ),chains=4, cores=4, log_lik=TRUE 
+        SL    = "lower=0,upper=1", 
+        Y    = "lower=0,upper=1" 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
 )
-
-
-dashboard(m2)
-precis(m2, depth=1)
+dashboard(m2.3)
+precis(m2.3, depth=1)
 
 # Posterior Check
-post <- extract.samples(m2)
-## Correlation?
+post <- extract.samples(m2.3)
+
 R <- rlkjcorr( 1e4 , K=2 , eta=1 )# eta min lkj_corr()
 plot(density( R[,1,2]), ylim = c(0, 1))
-dens(post$Rho[,1,2], add=TRUE, lty=2) # low correlation
-
+# This is complicated as cholesky correlation ⌈
+true_rho_samples=NULL
+for (i in 1:2000) {
+  L <- post$RhoSSL[i, , ]
+  R <- L %*% t(L)
+  true_rho_samples[i] <- R[1, 2]
+}
+dens(true_rho_samples, add = TRUE, lty = 2)
 
 ## Posterior Predictions
 
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
-KbyS<- sapply(Sseq, 
-    function (i) inv_logit(post$aK + post$bK_S * i + t(t(post$bK_SL) * colMeans(post$SL)) + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * d$dK )) 
+KbyS<- sapply(Sseq, # Tricky but t and t to calculate estimates by group, though dK does not have group so do not need 
+    function (i) inv_logit(post$aK + post$bK_S * i + t(t(post$bK_SL) * colMeans(post$SL)) + rep(post$bK_dK, 25) * d$dK )) 
 means<- apply( KbyS , 2 , mean )
 PIs<- apply( KbyS , 2 , PI )
 lines(Sseq, means, col = 2, lwd = 3)
 lines(Sseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
+
 plot(SL, d$K)
+points(post$SL[1,], d$K, col = 2)
 SLseq<-seq(0, 1, len = 20)
-KbySL<- sapply(SLseq, # Tricky but t and t to calculate estimates by group, though dK does not have group so do not need 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + post$bK_SL * i + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * d$dK )) 
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + post$bK_SL * i + rep(post$bK_dK, 25) * d$dK )) 
 means<- apply( KbySL , 2 , mean )
 PIs<- apply( KbySL , 2 , PI )
 lines(SLseq, means, col = 2, lwd = 3)
 lines(SLseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
+
 plot(d$dK, d$K)
 dKseq<-seq(-2.5, 2, len = 20)
 KbydK<- sapply(dKseq, 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + t(t(post$bK_Y) * colMeans(post$Y)) + rep(post$bK_dK,25) * i )) 
+    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + rep(post$bK_dK, 25) * i )) 
 PIs<- apply( KbydK , 2 , PI )
 means<- apply( KbydK , 2 , mean )
 lines(dKseq, means, col = 2, lwd = 3)
 lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
-plot(Y, d$K)
-Yseq<-seq(0, 1, len = 20)
-KbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aK + t(t(post$bK_S) * d$S) + t(t(post$bK_SL) * colMeans(post$SL)) + post$bK_Y * i + rep(post$bK_dK,25) * d$K )) 
-PIs<- apply( KbyY , 2 , PI )
-means<- apply( KbyY , 2 , mean )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 # Model S
 plot(d$dS, d$S)
@@ -444,9 +579,8 @@ lines(dSseq, means, col = 2, lwd = 3)
 lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-
 # Compare models
-model_comparison <- compare(m1, m2)
+model_comparison <- compare(m1.3, m2.3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
@@ -460,70 +594,145 @@ m3<- ulam(
         K ~ normal(mu_K, U), 
         logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_Y * Y[i] + bK_dK * dK + bK_T[T],
 
-        # We do not know anything about this but think similar for all group. 
-        # So use partial pooling to regularize the estimate. 
-        # mean should start at 0 and has small variation.
-        
-        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.3),
+        # Basically same as m1 but not regularization (no pooling). 
+        # bK_T is regularized to maintain the efficiency. 
+
+        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.1), # This is different from the other one, so that bK_T works well; otherwise, it does not somehow.
         vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
-        bK_T_bar ~ normal(0, 0.3), # regularization
-        sigma_bK_T ~ exponential(6), 
-        z_bK_T[T] ~ normal(0, 1),
+        bK_T_bar ~ normal(0, 0.1), # regularization but not high sigma
+        sigma_bK_T ~ exponential(1), # Needs to be 1 to maintain bK_T. 
+        z_bK_T[T] ~ normal(0, 0.1),
 
         U ~ exponential(1),
-
 
     # Model S 
         S ~ normal(mu_S, sigma_S),
         logit(mu_S) <- aS + bS_dS * dS + bS_Y * Y[i] + bS_T[T],
 
-        # I am hoping/believing b_dS is negative and b_Y_S is positive 
-        # partial pooling for the same reason for a2 and b_Y_S
+        # I am hoping/believing b_dS is negative, b_Y_S is positive, and bS_T is different for each one.  
         c(aS, bS_Y, bS_dS) ~ normal(0,0.1), 
+        # bS_T is regularized. 
         vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
-        bS_T_bar ~ normal(0, 0.001), # regularization
-        sigma_bS_T ~ exponential(10), 
+        bS_T_bar ~ normal(0, 0.1), 
+        sigma_bS_T ~ exponential(1), 
         z_bS_T[T] ~ normal(0, 0.1),
 
         sigma_S ~ exponential(1),
 
-        # Model SL by Y 
-        # The log function and prior was refered to the previous research of Sea Level Change over time. 
-        # This function is abstruct so I will have to actually stan code to provide accurate estimates
-        # ulam code in r does not allow us to hartd code the conditional function. 
-        # vector[200]: SL ~ normal(muSL + aSL2, sigmaSL),
-        vector[200]: SL ~ normal(mu_SL, sigma_SL),
-        vector[200]: logit(mu_SL) <- aSL + Y[i] * bSL,
-        # Should be very low variation since this part is hard coded.
-        # This time the estimation is not great so this is fine
-        aSL ~ normal(-4, 0.2),  
-        bSL ~ normal(10, 0.2),  
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
 
-        sigma_SL ~ exponential(1), 
-
-         # Model T 
+    # Model T
         T ~ poisson(Y * 25),
 
-        # Model T by Y 
-        vector[200]:Y ~ uniform( 0 , 1 )
-
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
     ), dat = d, constraints = list(
-        SL    = "lower=0,upper=1" # SL is between 0 and 1 
-    ),chains=4, cores=4, log_lik=TRUE
+        SL   = "lower=0,upper=1", # SL is between 0 and 1 
+        Y    = "lower=0,upper=1" # Y is between 0 and 1 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
+)
+precis(m3, depth = 1)
+
+
+m3.2<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_dK * dK + bK_T[T],
+
+        c(aK, bK_S,  bK_SL, bK_Y, bK_dK) ~ normal(0,0.1),
+        vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
+        bK_T_bar ~ normal(0, 0.1), 
+        sigma_bK_T ~ exponential(1), 
+        z_bK_T[T] ~ normal(0, 0.1),
+
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS + bS_dS * dS + bS_Y * Y[i] + bS_T[T],
+
+        c(aS, bS_Y, bS_dS) ~ normal(0,0.1), 
+        vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
+        bS_T_bar ~ normal(0, 0.1), 
+        sigma_bS_T ~ exponential(1), 
+        z_bS_T[T] ~ normal(0, 0.1),
+
+        sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+    # Model T
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+    ), dat = d, constraints = list(
+        SL   = "lower=0,upper=1", 
+        Y    = "lower=0,upper=1"  
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
+)
+precis(m3.2, depth = 1)
+
+
+m3.3<- ulam(
+    alist (
+    # Main model K
+        K ~ normal(mu_K, U), 
+        logit(mu_K) <- aK + bK_S * S + bK_SL * SL[i] + bK_dK * dK + bK_T[T],
+
+        c(aK, bK_S,  bK_SL, bK_dK) ~ normal(0,0.1),
+        vector[25]: bK_T <- bK_T_bar + sigma_bK_T * z_bK_T[T],
+        bK_T_bar ~ normal(0, 0.1), 
+        sigma_bK_T ~ exponential(1), 
+        z_bK_T[T] ~ normal(0, 0.1),
+
+        U ~ exponential(1),
+
+    # Model S 
+        S ~ normal(mu_S, sigma_S),
+        logit(mu_S) <- aS + bS_dS * dS + bS_T[T],
+
+        c(aS, bS_dS) ~ normal(0,0.1), 
+        vector[25]: bS_T <- bS_T_bar + sigma_bS_T * z_bS_T[T],
+        bS_T_bar ~ normal(0, 0.1), 
+        sigma_bS_T ~ exponential(1), 
+        z_bS_T[T] ~ normal(0, 0.1),
+
+        sigma_S ~ exponential(1),
+
+    # Model SL by Y
+        vector[200]: SL ~ normal(inv_logit(6 * Y - 2) - 0.04, 0.05),
+
+    # Model T
+        T ~ poisson(Y * 25),
+
+    # Model T by Y 
+        vector[200]:Y ~ normal( 0.5, 0.2)
+    ), dat = d, constraints = list(
+        SL   = "lower=0,upper=1",
+        Y    = "lower=0,upper=1" 
+    ), chains=4, cores=4, iter= 4000, warmup = 2000, log_lik=TRUE, max_treedepth = 13, control = list(
+    adapt_delta = 0.99
+  )
 )
 
-dashboard(m3)
-precis(m3, depth=1)
+dashboard(m3.3)
+precis(m3.3, depth = 1)
 
 # Posterior Check
-post <- extract.samples(m3)
-
-# Model K
+post <- extract.samples(m3.3)
 
 plot(d$S, d$K)
 Sseq<-seq(0, 0.5, len = 20)
 KbyS<- sapply(Sseq, 
-    function (i) inv_logit(post$aK + post$bK_S * i + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
+    function (i) inv_logit(post$aK + post$bK_S * i + post$bK_SL * colMeans(post$SL) + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ) )
 means<- apply( KbyS , 2 , mean )
 PIs<- apply( KbyS , 2 , PI )
 lines(Sseq, means, col = 2, lwd = 3)
@@ -532,9 +741,10 @@ lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 
 plot(SL, d$K)
+points(post$SL[1,], d$K, col = 2) # include the estimated points, though we confirmed above that it is close to the orignial
 SLseq<-seq(0, 1, len = 20)
-KbySL<- sapply(SLseq,  # This is tricky but use bK_T for T value and others are not stratified so randomly assigned
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_Y * colMeans(post$Y)  + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
+KbySL<- sapply(SLseq, 
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] )) 
 means<- apply( KbySL , 2 , mean )
 PIs<- apply( KbySL , 2 , PI )
 lines(SLseq, means, col = 2, lwd = 3)
@@ -545,27 +755,16 @@ lines(SLseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 plot(d$dK, d$K)
 dKseq<-seq(-2.5, 2, len = 20)
 KbydK<- sapply(dKseq, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y)  + post$bK_dK * i + colMeans(post$bK_T)[d$T] ))
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_dK * i + colMeans(post$bK_T)[d$T] )) 
 PIs<- apply( KbydK , 2 , PI )
 means<- apply( KbydK , 2 , mean )
 lines(dKseq, means, col = 2, lwd = 3)
 lines(dKseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dKseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-plot(Y, d$K)
-Yseq<-seq(0, 1, len = 20)
-KbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] ))
-PIs<- apply( KbyY , 2 , PI )
-means<- apply( KbyY , 2 , mean )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
-
 plot(T, d$K)
 KbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_Y * colMeans(post$Y) + post$bK_dK * d$dK + colMeans(post$bK_T)[i] ))
+    function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * colMeans(post$SL) + post$bK_dK * d$dK + colMeans(post$bK_T)[i]))
 PIs<- apply( KbyT , 2 , PI )
 means<- apply( KbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
@@ -573,49 +772,39 @@ points(1:25, PIs[1, ], col = 2, lty = 2 )
 points(1:25, PIs[2, ], col = 2, lty = 2 )
 for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 
-
 # Model S
-
 plot(d$dS, d$S)
 dSseq<-seq(-2, 2, len = 20)
 SbydS<- sapply(dSseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * i + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[d$T]))
-means<- apply( SbydS , 2 , mean )
+    function (i) inv_logit(post$aS + post$bS_dS * i + colMeans(post$bS_T)[d$T] )) # Used mean of each simulated data
 PIs<- apply( SbydS , 2 , PI )
+means<- apply( SbydS , 2 , mean )
 lines(dSseq, means, col = 2, lwd = 3)
 lines(dSseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
 lines(dSseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
-plot(Y, d$S)
-Yseq<-seq(0, 1, len = 20)
-SbyY<- sapply(Yseq, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * i + colMeans(post$bS_T)[d$T]))
-means<- apply( SbyY , 2 , mean )
-PIs<- apply( SbyY , 2 , PI )
-lines(Yseq, means, col = 2, lwd = 3)
-lines(Yseq, PIs[1, ], col = 2, lty = 2, lwd = 3)
-lines(Yseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
-
 plot(T, d$S)
 SbyT<- sapply(1:25, 
-    function (i) inv_logit(post$aS + post$bS_dS * d$dS + post$bS_Y * colMeans(post$Y) + colMeans(post$bS_T)[i]))
+    function (i) inv_logit(post$aS + post$bS_dS * d$dS + colMeans(post$bS_T)[i]))
 PIs<- apply( SbyT , 2 , PI )
 means<- apply( SbyT , 2 , mean )
 points(1:25, means, col = 2, lwd = 4)
 points(1:25, PIs[1, ], col = 2, lty = 2)
 points(1:25, PIs[2, ], col = 2, lty = 2)
 for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
-
 # Compare models
-model_comparison <- compare(m1, m3)
+model_comparison <- compare(m1.3, m3.3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
 
-model_comparison <- compare(m2, m3)
+model_comparison <- compare(m2.3, m3.3)
 print(model_comparison)
 # Plot WAIC/PSIS differences
 plot(model_comparison)
+
+
+
 
 
 rm(list=ls())
