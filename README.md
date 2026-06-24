@@ -10,7 +10,7 @@
 - [Overview.pdf](https://github.com/Mufurun/KOsyndata/blob/main/overview.pdf): PDF file to outline the Bayesian analysis.
 - [Overview.tex](https://github.com/Mufurun/KOsyndata/blob/main/overview.tex): Latex Source file for the pdf
 - [m.Rmd](https://github.com/Mufurun/KOsyndata/blob/main/m.Rmd): Rmd file that discribes the m1, m2, and m3.
-- [m.html](https://github.com/Mufurun/KOsyndata/blob/main/m.html)
-- [m.pdf](https://github.com/Mufurun/KOsyndata/blob/main/m.pdf)
+    - [m.html](https://github.com/Mufurun/KOsyndata/blob/main/m.html): Make Rmd easier to read. 
+    - [m.pdf](https://github.com/Mufurun/KOsyndata/blob/main/m.pdf): Make Rmd easier to read.
 - [m.r](https://github.com/Mufurun/KOsyndata/blob/main/m.r): R source file that does the same thing as Rmd. Who hates R file?
 - [KSModel.Rmd](https://github.com/Mufurun/KOsyndata/blob/main/KSModel.Rmd): Initial file, ending up with scratches
