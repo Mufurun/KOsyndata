@@ -8,7 +8,7 @@
 
 ## Github Site Map 
 - [Overview.pdf](https://github.com/Mufurun/KOsyndata/blob/main/overview.pdf): PDF file to outline the Bayesian analysis.
-- [Overview.tex](https://github.com/Mufurun/KOsyndata/blob/main/overview.tex): Latex Source file for the pdf
+    - [Overview.tex](https://github.com/Mufurun/KOsyndata/blob/main/overview.tex): Latex Source file for the pdf
 - [m.Rmd](https://github.com/Mufurun/KOsyndata/blob/main/m.Rmd): Rmd file that discribes the m1, m2, and m3.
     - [m.html](https://github.com/Mufurun/KOsyndata/blob/main/m.html): Make Rmd easier to read. 
     - [m.pdf](https://github.com/Mufurun/KOsyndata/blob/main/m.pdf): Make Rmd easier to read.

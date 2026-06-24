@@ -1,3 +1,9 @@
+---
+title: "Models Rmd"
+output:
+  html_document: default
+  pdf_document: default
+---
 # Models
 
 - Package Installation
@@ -748,7 +754,7 @@ m3<- ulam(
     adapt_delta = 0.99
   )
 )
-precis(m3, depth = 1)
+dashboard(m3)
 
 ```
 
@@ -797,7 +803,7 @@ m3.2<- ulam(
   )
 )
 
-precis(m3.2, depth = 1)
+dashboard(m3.2)
 ```
 
 - This is still not the best model with low efficiency. I will remove one more parameter. 
