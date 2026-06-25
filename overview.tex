@@ -83,6 +83,7 @@ Publication and publication year can bias the proportion of Kozu obsidians. Alth
 \end{tikzpicture}
 \caption{DAG of causalities among attributes of dataset - K: a ratio of Kouzu obsidians, S: a ratio of Shinshu obsidians, O: other sites, T: typology of artifacts or associated artifacts in the same layer, P: publication, PY: publication year.  }
 \end{figure}
+
 \newpage
 
 Now, hypothesis of the analysis is sea level and proportion of Shinshu obsidians affect the Kozu obsidians to check the degree of influence. 
@@ -118,14 +119,8 @@ The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist
     \draw [->, red, thick] (S) -- (K);
     \draw [->] (U) -- (K);
 \end{tikzpicture}
-\caption{DAG of causalities among parameters - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
+\caption{DAG of causalities among parameters (Model 1) - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
 \end{figure}
-
-\section{Three Models Proposed here}
-As a background knowledge, we know the association of SL and Y based on previous research (). Therefore, multi-level modeling is used. 
-The basic idea is that as T is observed parameter of Y, Y can be the True value of T, in other words. Then, I can make multilevel models, including Y predicts T to simulate the true Y values. As Y is estimated in ulam model of rethinking package, we can use it to estimate K, S, and SL.
-The relationship between Y and T can be based on the Bayesian Analysis of Typological dates by Kanezaki, Omori, and Kobayashi in 2025 (\url{https://www.cambridge.org/core/journals/radiocarbon/article/optimal-bayesian-chronological-modeling-for-high-resolution-chronology-for-the-middle-jomon-of-kanto-region-honshu-island-japan-approaching-a-generational-scale/4B1717D6D82FFA1CF8A63E6B1EBCCC8D}). 
-However, in this case, T is modeled simple poisson distribution with 25 phases.
 
 
 \begin{figure}[H]
@@ -136,36 +131,74 @@ However, in this case, T is modeled simple poisson distribution with 25 phases.
     dashed_node/.style={circle, draw, dashed, minimum size=8mm, thick},
     directed/.style={-Stealth, thick} 
 ]
-    \node[dashed_node] (Y) at (2,5) {Y};
-    \node (T) at (6,2.5) {T};
+    \node[dashed_node] (Y) at (2,5) {Y\textsubscript{T}};
+    \node (T) at (6,2.5) {$\not$T};
     \node[dashed_node] (U) at (1,1) {U};
-    \node[red, dashed_node] (SL) at (1.5,2.7) {SL};
-    \node[blue, rectangle, draw, minimum size=7mm, thick] (K) at (3,1) {K};
-    \node[red, solid_node] (S) at (3.5,3.2) {S};
+    \node[red, dashed_node] (SL) at (1.5,2.7) {SL\textsubscript{T}};
+    \node[blue, rectangle, draw, minimum size=7mm, thick] (K) at (3,1) {K\textsubscript{T}};
+    \node[red, solid_node] (S) at (3.5,3.2) {S\textsubscript{T}};
     \node (dK) at (4.5,1) {dK};
     \node (dS) at (4,2) {dS};
-    \draw [->] (T) -- (Y);
-    \draw [->] (Y) -- (SL);
+    
     \draw [->] (Y) -- (K);
-    \draw [->] (T) -- (S);
-    \draw [->] (T) -- (K);
+    \draw [->, green!70!black, thick] (Y) -- (SL);
+    \draw [->, green!70!black, thick] (Y) -- (S);
     \draw [->, red, thick] (SL) -- (K);
     \draw [->] (dS) -- (S);
     \draw [->] (dK) -- (K);
     \draw [->, red, thick] (S) -- (K);
     \draw [->] (U) -- (K);
 \end{tikzpicture}
-\caption{DAG of causalities among parameters - K: a ratio of Kouzu obsidians (blue solid square), S: a ratio of Shinshu obsidians (red dashed circle), SL: sea level difference based on current level (m; red dashed circle), T: typology of artifacts or associated artifacts in the same layer, dK: distance from Kozusima (km), dS: distance from the centre of Shinshu production sites (km), Y: true date (dashed circle as it is hidden), U: other hidden parameters influencing K (dashed). Colored arrows are from predictors to estimate. }
+\caption{DAG of causalities with hierarchical modeling with stratified by T (Model 2) - See Figure 1 for notations. }
 \end{figure}
 
-\begin{itemize}
-    \item Model 1: stratifies data by T, and includes all the causation in Fig. 3: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
+\begin{figure}[H]
+\centering 
+\begin{tikzpicture}[
+    node distance=2cm,
+    solid_node/.style={circle, draw, minimum size=8mm, thick},
+    dashed_node/.style={circle, draw, dashed, minimum size=8mm, thick},
+    directed/.style={-Stealth, thick} 
+]
+    \node[dashed_node] (Y) at (2,5) {Y\textsubscript{T}};
+    \node (T) at (6,2.5) {$\not$T};
+    \node[dashed_node] (U) at (1,1) {U};
+    \node[red, dashed_node] (SL) at (1.5,2.7) {SL\textsubscript{T}};
+    \node[blue, rectangle, draw, minimum size=7mm, thick] (K) at (3,1) {K\textsubscript{T}};
+    \node[red, solid_node] (S) at (3.5,3.2) {S\textsubscript{T}};
+    \node (dK) at (4.5,1) {dK};
+    \node (dS) at (4,2) {dS};
+    
+    \draw [->] (Y) -- (K);
+    \draw [->, green!70!black, thick] (Y) -- (SL);
+    \draw [->, red, thick] (SL) -- (K);
+    \draw [->] (dS) -- (S);
+    \draw [->] (dK) -- (K);
+    \draw [->, red, thick] (S) -- (K);
+    \draw [->] (U) -- (K);
+\end{tikzpicture}
+\caption{DAG of causalities with some hierarchical modeling with stratified by T (Model 3) - causality of Y -> S are ignored as it is represented in auto-correlation between S and SL, though Y -> SL is needed to estimate hidden SL. See Figure 1 for notations. }
+\end{figure}
 
-    \item Model 2: stratifies data by T, and includes all the causation in Fig. 4: Model T by Y, Model SL by Y, Model S by dS, Model K by S, SL, Y, dK, and U with correlation between S and SL.
+
+\section{Three Models Proposed here}
+As a background knowledge, we know the association of SL and Y based on previous research (). Therefore, multi-level modeling is used. 
+The basic idea is that as T is observed parameter of Y, Y can be the True value of T, in other words. Then, I can make multilevel models, including Y predicts T to simulate the true Y values. As Y is estimated in ulam model of rethinking package, we can use it to estimate K, S, and SL.
+The relationship between Y and T can be based on the Bayesian Analysis of Typological dates by Kanezaki, Omori, and Kobayashi in 2025 (\url{https://www.cambridge.org/core/journals/radiocarbon/article/optimal-bayesian-chronological-modeling-for-high-resolution-chronology-for-the-middle-jomon-of-kanto-region-honshu-island-japan-approaching-a-generational-scale/4B1717D6D82FFA1CF8A63E6B1EBCCC8D}). 
+However, in this case, T is modeled simple poisson distribution with 25 phases.
+
+
+
+\begin{itemize}
+
+    \item Model 1: includes all the causation in Fig. 3 without any stratification: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
+
+    \item Model 2: stratifies data by T, and includes all the causation in Fig. 3: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
+
+    \item Model 3: stratifies data by T, and includes all the causation in Fig. 4: Model T by Y, Model SL by Y, Model S by dS, Model K by S, SL, Y, dK, and U with correlation between S and SL.
     \begin{itemize}
-        \item Although Model 2 does not rely on Y to predict S, the causation is represented as correlation between S and SL. 
+        \item Although Model 3 does not rely on Y to predict S, the causation is represented as correlation between S and SL. 
     \end{itemize} 
-    \item Model 3: includes all the causation in Fig. 3 without any stratification: Model T by Y, Model SL by Y, Model S by Y and dS, Model K by S, SL, Y, dK, and U. 
     \begin{itemize}
         \item See the m.Rmd and m.html
     \end{itemize}
@@ -176,64 +209,51 @@ Models from next page shows the full model including all parameters; however, th
 In this analysis, I will decide what is the best model for the synthetic data. However, it might not be the case for actual dataset. 
 
 
-
 \newpage
-
 \section{The priors and statistical model for Model 1 (m1)}
-- This model stratifies S, SL, and Y and includes hierarchical models of S and SL by Y
+- This model does not stratify any parameters, and includes T parameter. 
+
 \begin{itemize}
 \item Model K
 $$K \sim Normal(\mu_K, U) $$
-$$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{Y}}[T] \cdot Y + \beta _{K_{dK}} * dK$$
-
+$$logit(\mu_K) = \alpha _{K} + \beta _{K_S} \cdot S + \beta _{K_{SL}} \cdot SL + \beta _{K_{Y}} \cdot Y + \beta _{K_{dK}} * dK + \beta _{K_T}[T]$$
 \begin{itemize}
     \item We do not know anything about this but think similar for all group. 
-    \item So use partial pooling to regularize the estimate. 
-    \item mean should start at 0 and has small variation.
+    \item Mean should start at 0 and has small variation.
     \item In this case (m1), we do not include correlation. 
-    \item This is because multilevel models of S and SL includes the information of Y 
-    \item But we have to regularize.
+    \item $\beta _{K_T}$ is regularized to maintain the efficiency. 
+
 \end{itemize}
-$$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
-$$\beta _{K_S } = \overline{\beta _{K _S}} + \sigma_{\beta _{K _S}} * z_{\beta _{K_S}}[T] $$
-$$\beta _{K_SL } = \overline{\beta _{K _{SL}}} + \sigma_{\beta _{K _{SL}}} * z_{\beta _{K_{SL}}}[T] $$
-$$\beta _{K_Y } = \overline{\beta _{K _Y}} + \sigma_{\beta _{K _Y}} * z_{\beta _{K_Y}}[T] $$
 
-$$\overline{\alpha _K}, \overline{\beta _{K _S}}, \overline{\beta _{K _{SL}}}, \overline{\beta _{K _Y}} \sim Normal(0,0.3)$$
-$$\sigma_{\alpha _K}, \sigma_{\beta _{K _S}}, \sigma_{\beta _{K _{Sl}}}, \sigma_{\beta _{K _Y}} \sim Exponential(6)$$
-$$z_{\alpha _K}[T] \sim Normal(0,0.1)$$
-$$z_{\beta _{K_S}}[T]  \sim Normal(0,0.1)$$
-$$z_{\beta _{K_{SL}}}[T]  \sim Normal(0,0.1)$$
-$$z_{\beta _{K_Y}}[T]  \sim Normal(0,0.1)$$
-
+$$\alpha _K, \beta _{K_S }, \beta _{K_{SL} }, \beta _{K_Y }, \beta _{K_{dK}}  \sim Normal(0,0.1)$$
 \begin{itemize}
-    \item Followings don't need regularization
+    \item This normal distribution has to have the sigma of 0.1. Otherwise, parameter T does not move as expected.
+    \item Priors below also has to be strange like this. 
     \item We are hoping/believing $b_{dK}$ is negative, but this is not prior. 
+
 \end{itemize}
-$$\beta _{K_{dK}} \sim Normal(0, 0.3)$$
+
+$$\beta _{K_T} = \overline{\beta _{K_T}} + \sigma_{\beta _{K_T}} * z_{\beta_{K_T}}[T]$$
+$$\overline{\beta {K_T}} \sim Normal(0, 0.1)$$
+$$\sigma_{\beta _{K_T}} \sim Exponential(1)$$
+$$z_{\beta _{K_T}}[T] \sim Normal(0, 0.1)$$
+
 $$U \sim Exponential(1)$$
 
 
 \item Model S 
 $$S \sim Normal(\mu_S, \sigma_S)$$
-$$logit(\mu_S) = \alpha _S [T] + \beta _{S_Y} \cdot Y + \beta _ {S_{dS}} * dS$$
+$$logit(\mu_S) = \alpha _S + \beta _{S_Y} \cdot Y + \beta _ {S_{dS}} \cdot dS + \beta _{S_T}[T]$$
 \begin{itemize}
     \item I am hoping/believing $\beta_{dS}$ is negative and $\beta_{Y_S}$ is positive 
-    \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
 \end{itemize}
-$$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
-$$\beta _{S_Y} = \overline{\beta _{S_Y}} + \sigma _{\beta _{S_Y}} * z _ {\beta _{S_Y}}[T]$$
 
-$$\overline{\alpha _S}, \overline{\beta _{S_Y}} \sim Normal(0,0.1)$$
-$$\sigma_{\alpha _S}, \sigma _{\beta _{S_Y}} \sim Exponential(6)$$
-$$z_{\alpha _S}[T] \sim Normal(0,0.1)$$
-$$z _{\beta _{S_Y}}[T] ~ normal(0,0.1)$$
+$$\alpha_S, \beta _{S_Y}, \beta _{S_{dS}} \sim Normal(0,0.1)$$
+$$\beta _{S_T} = \overline{\beta _{S_T}} + \sigma_{\beta _{S_T}} * z_{\beta_{S_T}}[T]$$
+$$\overline{\beta _{S_T}} \sim Normal(0, 0.1)$$
+$$\sigma_{\beta _{S_T}} \sim Exponential(1)$$
+$$z_{\beta _{S_T}}[T] \sim Normal(0, 0.1)$$
 
-\begin{itemize}
-    \item don't need regularization
-\end{itemize}
-$$\beta {S_{dS}} \sim Normal(0,0.3)$$
-$$\sigma_S \sim Exponential(1)$$
 
 
 \item Model SL by Y 
@@ -256,6 +276,74 @@ $$Y \sim Normal(0.5, 0.2)$$
 \begin{itemize}
     \item With a constraint that Y between 0 and 1. 
 \end{itemize}
+
+\end{itemize}
+
+
+\newpage
+
+\section{The priors and statistical model for Model 2 (m2)}
+- This model stratifies S, SL, and Y and includes hierarchical models of S and SL by Y
+\begin{itemize}
+\item Model K
+$$K \sim Normal(\mu_K, U) $$
+$$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{Y}}[T] \cdot Y + \beta _{K_{dK}} * dK$$
+
+\begin{itemize}
+    \item Basically same as m1 but regularization (partial pooling). 
+    \item This does not need correlation because multilevel models of S and SL includes the information of Y 
+    \item But we have to regularize.
+\end{itemize}
+$$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
+$$\beta _{K_S } = \overline{\beta _{K _S}} + \sigma_{\beta _{K _S}} * z_{\beta _{K_S}}[T] $$
+$$\beta _{K_SL } = \overline{\beta _{K _{SL}}} + \sigma_{\beta _{K _{SL}}} * z_{\beta _{K_{SL}}}[T] $$
+$$\beta _{K_Y } = \overline{\beta _{K _Y}} + \sigma_{\beta _{K _Y}} * z_{\beta _{K_Y}}[T] $$
+
+$$\overline{\alpha _K}, \overline{\beta _{K _S}}, \overline{\beta _{K _{SL}}}, \overline{\beta _{K _Y}} \sim Normal(0,0.3)$$
+$$\sigma_{\alpha _K}, \sigma_{\beta _{K _S}}, \sigma_{\beta _{K _{Sl}}}, \sigma_{\beta _{K _Y}} \sim Exponential(6)$$
+$$z_{\alpha _K}[T] \sim Normal(0,0.1)$$
+$$z_{\beta _{K_S}}[T]  \sim Normal(0,0.1)$$
+$$z_{\beta _{K_{SL}}}[T]  \sim Normal(0,0.1)$$
+$$z_{\beta _{K_Y}}[T]  \sim Normal(0,0.1)$$
+
+\begin{itemize}
+    \item Followings don't need regularization.
+\end{itemize}
+$$\beta _{K_{dK}} \sim Normal(0, 0.3)$$
+$$U \sim Exponential(1)$$
+
+
+\item Model S 
+\begin{itemize}
+    \item Belows are similar to M1, though:
+    \item $\beta _{S_T}$ are removed. 
+    \item partial pooling for the same reason for $\alpha_S$ and $\beta _{Y_S}$
+\end{itemize}
+$$S \sim Normal(\mu_S, \sigma_S)$$
+$$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS + \beta _{S_Y} \cdot Y$$
+$$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
+$$\beta _{S_Y} = \overline{\beta _{S_Y}} + \sigma _{\beta _{S_Y}} * z _ {\beta _{S_Y}}[T]$$
+
+$$\overline{\alpha _S}, \overline{\beta _{S_Y}} \sim Normal(0,0.1)$$
+$$\sigma_{\alpha _S}, \sigma _{\beta _{S_Y}} \sim Exponential(6)$$
+$$z_{\alpha _S}[T] \sim Normal(0,0.1)$$
+$$z _{\beta _{S_Y}}[T] ~ normal(0,0.1)$$
+\begin{itemize}
+    \item don't need regularization
+\end{itemize}
+$$\beta {S_{dS}} \sim Normal(0,0.3)$$
+$$\sigma_S \sim Exponential(1)$$
+$$\sigma_S \sim Exponential(1)$$
+
+\item Model SL by Y 
+$$SL \sim Normal(inv_logit(6 * Y - 2) - 0.04, 0.05)$$
+
+\item Model T by Y  
+$$T \sim Poisson(Y * 25)$$
+
+\item Model Y randomly
+$$Y \sim Normal(0.5, 0.2)$$
+
 \end{itemize}
 
 
@@ -263,7 +351,7 @@ $$Y \sim Normal(0.5, 0.2)$$
 
 \newpage
 
-\section{The priors and statistical model for Model 2 (m2)}
+\section{The priors and statistical model for Model 3 (m3)}
 - This model stratifies S, SL, and Y and includes correlation between S and SL. 
 
 \begin{itemize}
@@ -272,10 +360,8 @@ $$Y \sim Normal(0.5, 0.2)$$
 $$K \sim Normal(\mu_K, U) $$
 $$logit(\mu_K) = \alpha _{K}[T] + \beta _{K_S}[T] \cdot S + \beta _{K_{SL}}[T] \cdot SL + \beta _{K_{Y}}[T] \cdot Y + \beta _{K_{dK}} * dK$$
 \begin{itemize}
-    \item We do not know anything about this but think similar for all group. 
-    \item So use partial pooling to regularize the estimate. 
-    \item mean should start at 0 and has small variation.
-    \item In this case (m2), we do include correlation between S and SL due to Y. 
+    \item Similar to the m2. 
+    \item In this case (m3), we do include correlation between S and SL due to Y. 
 \end{itemize}
 $$\alpha _K = \overline{\alpha _K} + \sigma_{\alpha _K} * z_{\alpha _K}[T] $$
 $$\beta _{K_Y } = \overline{\beta _{K _Y}} + \sigma_{\beta _{K _Y}} * z_{\beta _{K_Y}}[T] $$
@@ -292,17 +378,15 @@ $$\beta _{K_S}, \beta _{K_SL} \sim NonCenteredMultiNormal(\sigma_{S, SL}, \rho _
 $$\sigma_{S, SL} \sim exponential(2)$$
 $$ \rho _{S, SL} \sim lkj_corr_cholesky(1) $$
 $$z_{S, SL} \sim Normal(0, 1) $$
-\begin{itemize}
-    \item Followings don't need regularization
-    \item We are hoping/believing $b_{dK}$ is negative, but this is not prior. 
-\end{itemize}
 $$\beta _{K_{dK}} \sim Normal(0, 0.3)$$
 $$U \sim Exponential(1)$$
 
 \item Model S 
 \begin{itemize}
-    \item Belows are the same coding as M1
+    \item This one does not include $\beta_{S_Y}$ since this does not multi-model the causality. 
+    \item This is auto-correlation. 
 \end{itemize}
+
 $$S \sim Normal(\mu_S, \sigma_S)$$
 $$logit(\mu_S) = \alpha _S [T] + \beta _ {S_{dS}} * dS$$
 $$\alpha_S = \overline{\alpha _S} + \sigma_{\alpha _S} * z_{\alpha _S}[T]$$
@@ -315,6 +399,9 @@ $$\beta {S_{dS}} \sim Normal(0,0.1)$$
 $$\sigma_S \sim Exponential(1)$$
 
 \item Model SL by Y 
+\begin{itemize}
+    \item Belows are the same coding as m2
+\end{itemize}
 $$SL \sim Normal(inv_logit(6 * Y - 2) - 0.04, 0.05)$$
 
 \item Model T by Y  
@@ -324,64 +411,6 @@ $$T \sim Poisson(Y * 25)$$
 $$Y \sim Normal(0.5, 0.2)$$
 
 \end{itemize}
-
-
-
-
-
-\newpage
-\section{The priors and statistical model for Model 3 (m3)}
-- This model does not stratify any parameters, and includes T parameter. 
-
-\begin{itemize}
-\item Model K
-$$K \sim Normal(\mu_K, U) $$
-$$logit(\mu_K) = \alpha _{K} + \beta _{K_S} \cdot S + \beta _{K_{SL}} \cdot SL + \beta _{K_{Y}} \cdot Y + \beta _{K_{dK}} * dK + \beta _{K_T}[T]$$
-\begin{itemize}
-    \item Basically same as m1 but not regularization (no pooling). 
-    \item $\beta _{K_T}$ is regularized to maintain the efficiency. 
-\end{itemize}
-
-$$\alpha _K, \beta _{K_S }, \beta _{K_{SL} }, \beta _{K_Y }, \beta _{K_{dK}}  \sim Normal(0,0.1)$$
-\begin{itemize}
-    \item This normal distribution has to have the sigma of 0.1. Otherwise, parameter T does not move as expected.
-    \item Priors below also has to be strange like this. 
-\end{itemize}
-
-$$\beta _{K_T} = \overline{\beta _{K_T}} + \sigma_{\beta _{K_T}} * z_{\beta_{K_T}}[T]$$
-$$\overline{\beta {K_T}} \sim Normal(0, 0.1)$$
-$$\sigma_{\beta _{K_T}} \sim Exponential(1)$$
-$$z_{\beta _{K_T}}[T] \sim Normal(0, 0.1)$$
-
-$$U \sim Exponential(1)$$
-
-
-\item Model S 
-\begin{itemize}
-    \item Belows are similar to M1, though $\beta _{S_T}$ are added. 
-\end{itemize}
-$$S \sim Normal(\mu_S, \sigma_S)$$
-$$logit(\mu_S) = \alpha _S + \beta _ {S_{dS}} \cdot dS + \beta _{S_Y} \cdot Y + \beta _{S_T}[T]$$
-$$\alpha_S, \beta _{S_Y}, \beta {S_{dS}} \sim Normal(0,0.1)$$
-
-$$\beta _{S_T} = \overline{\beta _{S_T}} + \sigma_{\beta _{S_T}} * z_{\beta_{S_T}}[T]$$
-$$\overline{\beta {S_T}} \sim Normal(0, 0.1)$$
-$$\sigma_{\beta _{S_T}} \sim Exponential(1)$$
-$$z_{\beta _{S_T}}[T] \sim Normal(0, 0.1)$$
-
-$$\sigma_S \sim Exponential(1)$$
-
-\item Model SL by Y 
-$$SL \sim Normal(inv_logit(6 * Y - 2) - 0.04, 0.05)$$
-
-\item Model T by Y  
-$$T \sim Poisson(Y * 25)$$
-
-\item Model Y randomly
-$$Y \sim Normal(0.5, 0.2)$$
-
-\end{itemize}
-
 
 
 
