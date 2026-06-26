@@ -88,7 +88,7 @@ Publication and publication year can bias the proportion of Kozu obsidians. Alth
 
 Now, hypothesis of the analysis is sea level and proportion of Shinshu obsidians affect the Kozu obsidians to check the degree of influence. 
 The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist in the data. U is the standard deviation of the model. 
-
+The SL is estimated by Y refering the research of sea level change over time by Tanabe, & Nakashima in 2026 (\url{https://www.sciencedirect.com/science/article/pii/S266603342600016X#bib34})
 
 
 \begin{figure}[H]
@@ -149,7 +149,7 @@ The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist
     \draw [->, red, thick] (S) -- (K);
     \draw [->] (U) -- (K);
 \end{tikzpicture}
-\caption{DAG of causalities with hierarchical modeling with stratified by T (Model 2) - See Figure 1 for notations. }
+\caption{DAG of causalities with hierarchical modeling with stratified by T (Model 2) - See Figure 3 for notations. }
 \end{figure}
 
 \begin{figure}[H]
@@ -177,7 +177,7 @@ The parameters are T, K, S, dK, and dS. Y, SL, and U are hidden and do not exist
     \draw [->, red, thick] (S) -- (K);
     \draw [->] (U) -- (K);
 \end{tikzpicture}
-\caption{DAG of causalities with some hierarchical modeling with stratified by T (Model 3) - causality of Y -> S are ignored as it is represented in auto-correlation between S and SL, though Y -> SL is needed to estimate hidden SL. See Figure 1 for notations. }
+\caption{DAG of causalities with some hierarchical modeling with stratified by T (Model 3) - causality of Y -> S are ignored as it is represented in auto-correlation between S and SL, though Y -> SL is needed to estimate hidden SL. See Figure 3 for notations. }
 \end{figure}
 
 

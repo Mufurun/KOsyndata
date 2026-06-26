@@ -242,7 +242,7 @@ dashboard(m1.2)
 ```
 
 - This is still not the best model with low efficiency. I will remove one more parameter. 
-- I can remove bK_T or bS_T but this time, I want to make keep the information as other models keep it by stratification. 
+- I can remove bK_T or bS_T but this time, I want to keep the information as other models keep it by stratification. 
 ```{r m1.3, error = FALSE, warning = FALSE, message = FALSE}
 m1.3<- ulam(
     alist (
@@ -291,6 +291,7 @@ precis(m1.3, depth = 1)
 
 ```
 
+- This looks much better than previous ones with very high eff value.
 ### Posterior Check 
 
 ```{r post1}
@@ -335,9 +336,11 @@ for(i in 1 : 200) lines(c(Y[i], post$Y[1,i]), c(SL[i], post$SL[1,i]), col = 2)
 => this shows that the difference is not very large and hidden parameters have similar trend as the original (synthetized) data. 
 
 #### Posterior Simulation 
-
-
+- Let us take a look at the Posterior simulation, if simulated data align with original data. 
+- The red solid line is the mean and dashed lines are 95% percentile interval. if the most of datpoints are inside the percentile interval, the simulated data is very simular to the original data. 
 ##### Model K 
+
+
 ```{r postpredK, fig.show="hold", out.width="50%"}
 
 plot(d$S, d$K, main = "Synthetic Data Plot(d$S and d$K)")
@@ -352,7 +355,6 @@ lines(Sseq, PIs[2, ], col = 2, lty = 2, lwd = 3)
 
 
 plot(SL, d$K, main = "Synthetic Data Plot(SL and d$K)")
-points(post$SL[1,], d$K, col = 2) # include the estimated points, though we confirmed above that it is close to the orignial
 SLseq<-seq(0, 1, len = 20)
 KbySL<- sapply(SLseq, 
     function (i) inv_logit(post$aK + post$bK_S * d$S + post$bK_SL * i + post$bK_dK * d$dK + colMeans(post$bK_T)[d$T] )) 
@@ -385,7 +387,7 @@ for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 
 ```
 
-- Looks nice! 
+- Looks nice as most of the original data inside 95% Percentile Interval! 
 
 ##### Model S
 - Do the same thing for S 
@@ -420,11 +422,13 @@ for(i in 1:25) lines(c(i,i), c(PIs[1, i], PIs[2, i]), col = 2)
 
 This looks great. 
 
+\newpage
 
 
 ## Model 2
-- Also see overview.pdf to know statistical model and prior
 - This model stratifies all parameters by T. 
+- Since T is categorical parameter, it is easy to group by T.
+- Also see overview.pdf to know statistical model and prior
 
 ```{r m2}
 # Model 2 
@@ -588,14 +592,14 @@ dashboard(m2.3)
 precis(m2.3, depth=1)
 ```
 
-- This is very high eff and no divergent, as I can see in my synthetic data (I do not know yours,,,). This is great. This model is reliably sampled to be used for analysis!
+- This is very high eff and no divergent, as I can see in my synthetic data (hopefully, yours is the same,,,). This is great. This model is reliably sampled to be used for analysis!
 
 ### Posterior Check
 ```{r post2}
 post <- extract.samples(m2.3)
 ```
 
-- Since I haven't touched since, I do not check the hidden parameters. 
+- Since I haven't touched hidden parameters since, I do not check them here. 
 
 
 ```{r post2check, fig.show="hold", out.width="50%"}
@@ -664,7 +668,7 @@ plot(model_comparison, main = "Model Comparison between m1.3 and m2.3")
 - dSE: If the standard error is large relative to the difference, the two models have statistically indistinguishable predictive capacities.
 - weight: The Akaike weight, which represents the relative probability or evidence that a given model will make the best predictions among the set of compared models
 
-=> Therefore, the 2model 2.3 is better than the other one with lower WAIC, and so on...
+=> Therefore, the model 2.3 is better than the other one with lower WAIC, and so on...
 
 
 - but also I am wondering if I use correlation between S and SL instead of modeling Y in K model. 
@@ -677,8 +681,8 @@ This is because there is an auto-correlation!!
 
 ## Model 3 (m3)
 - see priors in overview.pdf, but this include correlation between SL and S. 
-- Instead, this does not include multilevel model of Y -> S, because it's in correlation. 
-- This is based on the Ch 14.3 in Statistical Rethinking as SL and S are not centred
+- Instead, this does not include multilevel model of Y -> S, because the information is in correlation. 
+- This code is based on the Ch 14.3 in Statistical Rethinking as SL and S are not centred
 ```{r m3}
 # Model 3
 m3<- ulam(
